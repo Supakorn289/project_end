@@ -1,0 +1,20 @@
+{
+  "timestamp": 1788159837.3044176,
+  "runtime_status": "ok",
+  "cycle": 21,
+  "step": 6,
+  "preset": 4,
+  "center_bearing_deg": 135.0,
+  "site_bearing_calibrated": false,
+  "frames_processed": 3,
+  "inference_ms": [
+    344.801,
+    399.622,
+    382.23
+  ],
+  "scan_ms": 6046.102,
+  "detections": 0,
+  "confirmed": [],
+  "cpu_percent": 29.1,
+  "ram_percent": 38.5
+}

@@ -1,0 +1,45 @@
+# ============================================================
+# Smart Fire Detection v2
+# Development / Testing Dependencies
+# ============================================================
+#
+# Purpose:
+#
+# - Development environment
+# - Unit testing
+# - Local verification
+# - Future CI testing
+#
+# Production Runtime:
+#
+# - DO NOT install this file unless development/test tools
+#   are required on the production machine.
+# - Production dependencies are defined in requirements.txt.
+#
+# ============================================================
+
+
+# ============================================================
+# Runtime Dependencies
+# ============================================================
+#
+# Install the same runtime dependency set used by Production.
+#
+# This keeps Development and Production environments aligned
+# before Development/Test-only packages are installed.
+#
+# ============================================================
+
+-r requirements.txt
+
+
+# ============================================================
+# Unit Testing
+# ============================================================
+#
+# pytest is pinned to make Development / CI test behavior
+# reproducible across machines.
+#
+# ============================================================
+
+pytest==9.1.1
