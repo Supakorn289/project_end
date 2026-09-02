@@ -1,0 +1,32 @@
+Smart Fire Detection v2 - Detection Test Summary
+Preset: 1
+Center Bearing: 0.0 deg
+
+Post-Stable AI Warm-up
+Warm-up is excluded from measured test frames and consensus.
+  Warm-up 1: 1404.9 ms
+  Warm-up 2: 336.2 ms
+  Warm-up 3: 332.0 ms
+  First: 1404.9 ms
+  Last: 332.0 ms
+  Median: 336.2 ms
+
+Measured AI Inference
+Warm-up samples are excluded.
+  Samples: 3
+  Mean: 374.5 ms
+  Median: 391.3 ms
+  Min: 340.6 ms
+  Max: 391.7 ms
+
+Frame 1: seq=147 inference=340.6 ms detections=0
+  - no Fire/Smoke above configured threshold
+
+Frame 2: seq=159 inference=391.7 ms detections=0
+  - no Fire/Smoke above configured threshold
+
+Frame 3: seq=172 inference=391.3 ms detections=0
+  - no Fire/Smoke above configured threshold
+
+Consensus result
+  - no confirmed detection

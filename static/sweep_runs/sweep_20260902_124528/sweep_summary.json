@@ -1,0 +1,350 @@
+{
+  "timestamp": "20260902_124528",
+  "sequence": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    4,
+    3,
+    2,
+    1,
+    6,
+    7,
+    8,
+    9,
+    8,
+    7,
+    6,
+    1
+  ],
+  "cycles_requested": 1,
+  "steps_completed": 17,
+  "total_confirmed_detections": 0,
+  "results": [
+    {
+      "step": 1,
+      "cycle": 1,
+      "preset": 1,
+      "center_bearing_deg": 0.0,
+      "status": "ok",
+      "stable_seq": 204,
+      "frames_processed": 3,
+      "inference_ms": [
+        332.736,
+        405.016,
+        390.462
+      ],
+      "scan_ms": 6715.822,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_01_cycle_01_preset_1_raw.jpg",
+      "annotated_image": "step_01_cycle_01_preset_1_annotated.jpg"
+    },
+    {
+      "step": 2,
+      "cycle": 1,
+      "preset": 2,
+      "center_bearing_deg": 45.0,
+      "status": "ok",
+      "stable_seq": 359,
+      "frames_processed": 3,
+      "inference_ms": [
+        333.25,
+        385.222,
+        400.846
+      ],
+      "scan_ms": 6198.606,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_02_cycle_01_preset_2_raw.jpg",
+      "annotated_image": "step_02_cycle_01_preset_2_annotated.jpg"
+    },
+    {
+      "step": 3,
+      "cycle": 1,
+      "preset": 3,
+      "center_bearing_deg": 90.0,
+      "status": "ok",
+      "stable_seq": 514,
+      "frames_processed": 3,
+      "inference_ms": [
+        355.942,
+        384.351,
+        393.548
+      ],
+      "scan_ms": 6223.129,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_03_cycle_01_preset_3_raw.jpg",
+      "annotated_image": "step_03_cycle_01_preset_3_annotated.jpg"
+    },
+    {
+      "step": 4,
+      "cycle": 1,
+      "preset": 4,
+      "center_bearing_deg": 135.0,
+      "status": "ok",
+      "stable_seq": 669,
+      "frames_processed": 3,
+      "inference_ms": [
+        321.139,
+        378.704,
+        392.689
+      ],
+      "scan_ms": 6151.667,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_04_cycle_01_preset_4_raw.jpg",
+      "annotated_image": "step_04_cycle_01_preset_4_annotated.jpg"
+    },
+    {
+      "step": 5,
+      "cycle": 1,
+      "preset": 5,
+      "center_bearing_deg": 177.5,
+      "status": "ok",
+      "stable_seq": 819,
+      "frames_processed": 3,
+      "inference_ms": [
+        324.611,
+        402.822,
+        352.584
+      ],
+      "scan_ms": 5985.581,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_05_cycle_01_preset_5_raw.jpg",
+      "annotated_image": "step_05_cycle_01_preset_5_annotated.jpg"
+    },
+    {
+      "step": 6,
+      "cycle": 1,
+      "preset": 4,
+      "center_bearing_deg": 135.0,
+      "status": "ok",
+      "stable_seq": 983,
+      "frames_processed": 3,
+      "inference_ms": [
+        322.359,
+        378.754,
+        396.397
+      ],
+      "scan_ms": 6579.004,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_06_cycle_01_preset_4_raw.jpg",
+      "annotated_image": "step_06_cycle_01_preset_4_annotated.jpg"
+    },
+    {
+      "step": 7,
+      "cycle": 1,
+      "preset": 3,
+      "center_bearing_deg": 90.0,
+      "status": "ok",
+      "stable_seq": 1182,
+      "frames_processed": 3,
+      "inference_ms": [
+        329.932,
+        387.913,
+        378.383
+      ],
+      "scan_ms": 7973.85,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_07_cycle_01_preset_3_raw.jpg",
+      "annotated_image": "step_07_cycle_01_preset_3_annotated.jpg"
+    },
+    {
+      "step": 8,
+      "cycle": 1,
+      "preset": 2,
+      "center_bearing_deg": 45.0,
+      "status": "ok",
+      "stable_seq": 1336,
+      "frames_processed": 3,
+      "inference_ms": [
+        439.657,
+        355.022,
+        395.558
+      ],
+      "scan_ms": 6256.66,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_08_cycle_01_preset_2_raw.jpg",
+      "annotated_image": "step_08_cycle_01_preset_2_annotated.jpg"
+    },
+    {
+      "step": 9,
+      "cycle": 1,
+      "preset": 1,
+      "center_bearing_deg": 0.0,
+      "status": "ok",
+      "stable_seq": 1492,
+      "frames_processed": 3,
+      "inference_ms": [
+        335.989,
+        389.052,
+        394.711
+      ],
+      "scan_ms": 6181.725,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_09_cycle_01_preset_1_raw.jpg",
+      "annotated_image": "step_09_cycle_01_preset_1_annotated.jpg"
+    },
+    {
+      "step": 10,
+      "cycle": 1,
+      "preset": 6,
+      "center_bearing_deg": 315.0,
+      "status": "ok",
+      "stable_seq": 1647,
+      "frames_processed": 3,
+      "inference_ms": [
+        329.842,
+        340.42,
+        387.338
+      ],
+      "scan_ms": 6133.658,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_10_cycle_01_preset_6_raw.jpg",
+      "annotated_image": "step_10_cycle_01_preset_6_annotated.jpg"
+    },
+    {
+      "step": 11,
+      "cycle": 1,
+      "preset": 7,
+      "center_bearing_deg": 270.0,
+      "status": "ok",
+      "stable_seq": 1803,
+      "frames_processed": 3,
+      "inference_ms": [
+        332.105,
+        400.751,
+        356.986
+      ],
+      "scan_ms": 6275.662,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_11_cycle_01_preset_7_raw.jpg",
+      "annotated_image": "step_11_cycle_01_preset_7_annotated.jpg"
+    },
+    {
+      "step": 12,
+      "cycle": 1,
+      "preset": 8,
+      "center_bearing_deg": 225.0,
+      "status": "ok",
+      "stable_seq": 1957,
+      "frames_processed": 3,
+      "inference_ms": [
+        328.309,
+        390.49,
+        397.326
+      ],
+      "scan_ms": 6172.266,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_12_cycle_01_preset_8_raw.jpg",
+      "annotated_image": "step_12_cycle_01_preset_8_annotated.jpg"
+    },
+    {
+      "step": 13,
+      "cycle": 1,
+      "preset": 9,
+      "center_bearing_deg": 182.5,
+      "status": "ok",
+      "stable_seq": 2108,
+      "frames_processed": 3,
+      "inference_ms": [
+        339.899,
+        398.054,
+        390.525
+      ],
+      "scan_ms": 6047.977,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_13_cycle_01_preset_9_raw.jpg",
+      "annotated_image": "step_13_cycle_01_preset_9_annotated.jpg"
+    },
+    {
+      "step": 14,
+      "cycle": 1,
+      "preset": 8,
+      "center_bearing_deg": 225.0,
+      "status": "ok",
+      "stable_seq": 2259,
+      "frames_processed": 3,
+      "inference_ms": [
+        329.037,
+        347.658,
+        381.529
+      ],
+      "scan_ms": 5953.535,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_14_cycle_01_preset_8_raw.jpg",
+      "annotated_image": "step_14_cycle_01_preset_8_annotated.jpg"
+    },
+    {
+      "step": 15,
+      "cycle": 1,
+      "preset": 7,
+      "center_bearing_deg": 270.0,
+      "status": "ok",
+      "stable_seq": 2412,
+      "frames_processed": 3,
+      "inference_ms": [
+        339.178,
+        362.365,
+        386.658
+      ],
+      "scan_ms": 6148.095,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_15_cycle_01_preset_7_raw.jpg",
+      "annotated_image": "step_15_cycle_01_preset_7_annotated.jpg"
+    },
+    {
+      "step": 16,
+      "cycle": 1,
+      "preset": 6,
+      "center_bearing_deg": 315.0,
+      "status": "ok",
+      "stable_seq": 2566,
+      "frames_processed": 3,
+      "inference_ms": [
+        331.174,
+        361.953,
+        393.623
+      ],
+      "scan_ms": 6167.271,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_16_cycle_01_preset_6_raw.jpg",
+      "annotated_image": "step_16_cycle_01_preset_6_annotated.jpg"
+    },
+    {
+      "step": 17,
+      "cycle": 1,
+      "preset": 1,
+      "center_bearing_deg": 0.0,
+      "status": "ok",
+      "stable_seq": 2720,
+      "frames_processed": 3,
+      "inference_ms": [
+        332.522,
+        384.295,
+        356.205
+      ],
+      "scan_ms": 6145.953,
+      "confirmed_count": 0,
+      "detections": [],
+      "raw_image": "step_17_cycle_01_preset_1_raw.jpg",
+      "annotated_image": "step_17_cycle_01_preset_1_annotated.jpg"
+    }
+  ]
+}
