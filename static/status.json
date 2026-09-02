@@ -1,20 +1,20 @@
 {
-  "timestamp": 1788334130.1884198,
+  "timestamp": 1788334812.3774295,
   "runtime_status": "ok",
-  "cycle": 6,
-  "step": 9,
-  "preset": 1,
-  "center_bearing_deg": 0.0,
+  "cycle": 13,
+  "step": 7,
+  "preset": 3,
+  "center_bearing_deg": 90.0,
   "site_bearing_calibrated": true,
   "frames_processed": 3,
   "inference_ms": [
-    327.503,
-    386.548,
-    364.016
+    320.768,
+    376.072,
+    377.212
   ],
-  "scan_ms": 6142.894,
+  "scan_ms": 6152.2,
   "detections": 0,
   "confirmed": [],
-  "cpu_percent": 28.4,
-  "ram_percent": 29.8
+  "cpu_percent": 27.9,
+  "ram_percent": 30.9
 }
