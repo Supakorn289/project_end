@@ -1,4 +1,10 @@
 import math
+import json
+from functools import lru_cache
+from pathlib import Path
+
+import cv2
+import numpy as np
 
 
 # ============================================================
@@ -51,6 +57,215 @@ def focal_length_px(
         * math.tan(
             math.radians(hfov_deg) / 2.0
         )
+    )
+
+
+
+# ============================================================
+# Calibrated Camera Ray
+# ============================================================
+
+@lru_cache(maxsize=1)
+def _load_runtime_camera_intrinsics():
+    """
+    Load the production camera intrinsic calibration once.
+
+    This calibration is used only for post-detection geometry.
+    It does NOT modify/preprocess frames before YOLO inference.
+    """
+
+    path = (
+        Path(__file__).resolve().parent
+        / "calibration"
+        / "camera_intrinsics.json"
+    )
+
+    if not path.is_file():
+        raise RuntimeError(
+            f"Camera intrinsics not found: {path}"
+        )
+
+    data = json.loads(
+        path.read_text(encoding="utf-8")
+    )
+
+    if not data.get(
+        "valid_for_production",
+        False,
+    ):
+        raise RuntimeError(
+            "Camera intrinsics are not production-valid"
+        )
+
+    if (
+        data.get("status")
+        != "intrinsics_calibrated"
+    ):
+        raise RuntimeError(
+            "Camera intrinsic status is not calibrated"
+        )
+
+    camera_matrix = np.array(
+        [
+            [
+                float(data["fx_px"]),
+                0.0,
+                float(data["cx_px"]),
+            ],
+            [
+                0.0,
+                float(data["fy_px"]),
+                float(data["cy_px"]),
+            ],
+            [
+                0.0,
+                0.0,
+                1.0,
+            ],
+        ],
+        dtype=np.float64,
+    )
+
+    distortion = np.asarray(
+        data["distortion_coefficients"],
+        dtype=np.float64,
+    )
+
+    return (
+        data,
+        camera_matrix,
+        distortion,
+    )
+
+
+def calibrated_horizontal_offset_deg(
+    x_px: float,
+    y_px: float,
+    frame_width: int,
+    frame_height: int,
+) -> float:
+    """
+    Convert a RAW distorted image pixel into the horizontal
+    camera-ray angle using calibrated OpenCV intrinsics.
+
+    Pipeline:
+
+        raw pixel
+            ↓
+        lens distortion correction
+            ↓
+        normalized camera ray
+            ↓
+        horizontal angular offset
+
+    Positive = right
+    Negative = left
+    """
+
+    values = (
+        x_px,
+        y_px,
+    )
+
+    if not all(
+        math.isfinite(v)
+        for v in values
+    ):
+        raise ValueError(
+            "Pixel coordinates must be finite"
+        )
+
+    (
+        data,
+        camera_matrix,
+        distortion,
+    ) = _load_runtime_camera_intrinsics()
+
+    calibrated_width = int(
+        data["frame_width"]
+    )
+
+    calibrated_height = int(
+        data["frame_height"]
+    )
+
+    if (
+        frame_width
+        != calibrated_width
+        or
+        frame_height
+        != calibrated_height
+    ):
+        raise RuntimeError(
+            "Camera intrinsic resolution mismatch: "
+            f"runtime={frame_width}x{frame_height}, "
+            f"calibration="
+            f"{calibrated_width}x{calibrated_height}"
+        )
+
+    point = np.array(
+        [
+            [
+                [
+                    float(x_px),
+                    float(y_px),
+                ]
+            ]
+        ],
+        dtype=np.float64,
+    )
+
+    normalized = cv2.undistortPoints(
+        point,
+        camera_matrix,
+        distortion,
+    )
+
+    ray_x = float(
+        normalized[0, 0, 0]
+    )
+
+    if not math.isfinite(
+        ray_x
+    ):
+        raise RuntimeError(
+            "Invalid undistorted camera ray"
+        )
+
+    return math.degrees(
+        math.atan2(
+            ray_x,
+            1.0,
+        )
+    )
+
+
+def calibrated_pixel_to_bearing(
+    preset_bearing_deg: float,
+    x_px: float,
+    y_px: float,
+    frame_width: int,
+    frame_height: int,
+    north_offset_deg: float = 0.0,
+) -> float:
+    """
+    Production bearing calculation using calibrated
+    lens intrinsics and distortion correction.
+    """
+
+    offset_deg = (
+        calibrated_horizontal_offset_deg(
+            x_px,
+            y_px,
+            frame_width,
+            frame_height,
+        )
+    )
+
+    return normalize_bearing(
+        preset_bearing_deg
+        + north_offset_deg
+        + offset_deg
     )
 
 
@@ -493,3 +708,193 @@ def bearing_to_compass(
         )
         % 8
     ]
+
+
+# === FINAL_DYNAMIC_3D_RAY_V1 ===
+#
+# Raw distorted pixel
+#   -> calibrated undistorted camera ray
+#
+# Camera coordinate convention:
+#   +X = image right
+#   +Y = image down
+#   +Z = optical forward
+#
+# Used by dynamic preset rotation runtime.
+#
+
+def calibrated_pixel_to_unit_ray(
+    x_px: float,
+    y_px: float,
+    frame_width: int,
+    frame_height: int,
+):
+    """
+    Convert current image pixel (x,y) into a calibrated
+    unit camera ray.
+
+    This function does NOT contain any preset bearing.
+    Preset orientation is applied later by preset_geometry.py.
+    """
+
+    import json
+    from pathlib import Path
+
+    import cv2
+    import numpy as np
+
+    values = (
+        x_px,
+        y_px,
+        frame_width,
+        frame_height,
+    )
+
+    if not all(
+        math.isfinite(float(v))
+        for v in values
+    ):
+        raise ValueError(
+            "Pixel/raster values must be finite"
+        )
+
+    frame_width = int(frame_width)
+    frame_height = int(frame_height)
+
+    if (
+        frame_width <= 0
+        or frame_height <= 0
+    ):
+        raise ValueError(
+            "Invalid runtime frame dimensions"
+        )
+
+    intrinsics_path = (
+        Path(__file__).resolve().parent
+        / "calibration"
+        / "camera_intrinsics.json"
+    )
+
+    if not intrinsics_path.exists():
+        raise FileNotFoundError(
+            f"Camera intrinsics not found: "
+            f"{intrinsics_path}"
+        )
+
+    data = json.loads(
+        intrinsics_path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    if not data.get(
+        "valid_for_production",
+        False,
+    ):
+        raise RuntimeError(
+            "Camera intrinsics are not "
+            "production-valid"
+        )
+
+    camera_matrix = np.asarray(
+        data["camera_matrix"],
+        dtype=np.float64,
+    )
+
+    distortion = np.asarray(
+        data["distortion_coefficients"],
+        dtype=np.float64,
+    ).reshape(-1, 1)
+
+    calibration_width = int(
+        data["frame_width"]
+    )
+
+    calibration_height = int(
+        data["frame_height"]
+    )
+
+    if (
+        calibration_width <= 0
+        or calibration_height <= 0
+    ):
+        raise RuntimeError(
+            "Invalid intrinsic calibration size"
+        )
+
+    #
+    # Scale K if runtime resolution differs while
+    # preserving the same optical/crop configuration.
+    #
+    sx = (
+        frame_width
+        / float(calibration_width)
+    )
+
+    sy = (
+        frame_height
+        / float(calibration_height)
+    )
+
+    K = camera_matrix.copy()
+
+    K[0, 0] *= sx
+    K[0, 2] *= sx
+
+    K[1, 1] *= sy
+    K[1, 2] *= sy
+
+    point = np.asarray(
+        [[[
+            float(x_px),
+            float(y_px),
+        ]]],
+        dtype=np.float64,
+    )
+
+    undistorted = cv2.undistortPoints(
+        point,
+        K,
+        distortion,
+    )
+
+    x_norm = float(
+        undistorted[0, 0, 0]
+    )
+
+    y_norm = float(
+        undistorted[0, 0, 1]
+    )
+
+    ray = np.asarray(
+        [
+            x_norm,
+            y_norm,
+            1.0,
+        ],
+        dtype=np.float64,
+    )
+
+    norm = float(
+        np.linalg.norm(ray)
+    )
+
+    if (
+        not math.isfinite(norm)
+        or norm <= 1e-12
+    ):
+        raise RuntimeError(
+            "Invalid calibrated camera ray"
+        )
+
+    ray /= norm
+
+    if not np.all(
+        np.isfinite(ray)
+    ):
+        raise RuntimeError(
+            "Non-finite calibrated camera ray"
+        )
+
+    return ray
+

@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width,initial-scale=1"
+    >
+
+    <title>
+        Smart Fire Control Center
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="/static/manager.css"
+    >
+</head>
+
+<body>
+
+<div class="shell">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">
+                🔥
+            </div>
+
+            <div>
+                <strong>
+                    Smart Fire
+                </strong>
+
+                <small>
+                    Control Center
+                </small>
+            </div>
+        </div>
+
+
+        <nav>
+            <button
+                class="nav active"
+                data-page="overview"
+            >
+                Overview
+            </button>
+
+            <button
+                class="nav"
+                data-page="setup"
+            >
+                Setup
+            </button>
+
+            <button
+                class="nav"
+                data-page="sites"
+            >
+                Sites
+            </button>
+
+            <button
+                class="nav"
+                data-page="calibration"
+            >
+                Calibration
+            </button>
+
+            <button
+                class="nav"
+                data-page="tests"
+            >
+                Tests
+            </button>
+
+            <button
+                class="nav"
+                data-page="events"
+            >
+                Events
+            </button>
+
+            <button
+                class="nav"
+                data-page="system"
+            >
+                System
+            </button>
+
+
+            <a
+                class="nav-link"
+                href="/settings"
+            >
+                Settings
+            </a>
+        </nav>
+
+
+        <div class="sidebar-footer">
+
+            <span
+                id="manager-dot"
+                class="dot"
+            ></span>
+
+            Manager :5050
+        </div>
+
+    </aside>
+
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div>
+                <h1 id="page-title">
+                    Overview
+                </h1>
+
+                <p id="page-subtitle">
+                    Runtime and installation status
+                </p>
+            </div>
+
+            <div class="top-actions">
+
+                <span
+                    id="site-mode"
+                    class="badge"
+                >
+                    ...
+                </span>
+
+                <span
+                    id="site-name"
+                    class="badge muted"
+                >
+                    Loading...
+                </span>
+
+            </div>
+
+        </header>
+
+
+        <section
+            id="page-overview"
+            class="page active"
+        >
+
+            <div
+                id="overview-cards"
+                class="cards"
+            ></div>
+
+
+            <div class="panel">
+
+                <div class="panel-head">
+                    <div>
+                        <h2>
+                            Detection Core
+                        </h2>
+
+                        <p>
+                            Frozen runtime capabilities
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    id="core-grid"
+                    class="status-grid"
+                ></div>
+
+            </div>
+
+
+            <div class="panel">
+
+                <div class="panel-head">
+                    <div>
+                        <h2>
+                            Installation Readiness
+                        </h2>
+
+                        <p>
+                            Current site setup requirements
+                        </p>
+                    </div>
+                </div>
+
+                <div id="readiness"></div>
+
+            </div>
+
+        </section>
+
+
+        <section
+            id="page-setup"
+            class="page"
+        >
+
+            <div class="panel">
+
+                <div class="panel-head">
+                    <div>
+                        <h2>
+                            Setup Wizard
+                        </h2>
+
+                        <p>
+                            Existing or new installation
+                        </p>
+                    </div>
+                </div>
+
+
+                <div class="choice-grid">
+
+                    <button
+                        class="choice"
+                        id="existing-choice"
+                    >
+                        <strong>
+                            Existing Site
+                        </strong>
+
+                        <span>
+                            Detect and reuse current calibration
+                        </span>
+                    </button>
+
+
+                    <button
+                        class="choice"
+                        id="new-choice"
+                    >
+                        <strong>
+                            New Site
+                        </strong>
+
+                        <span>
+                            Start a new installation workflow
+                        </span>
+                    </button>
+
+                </div>
+
+
+                <div class="mode-row">
+
+                    <button
+                        class="mode-btn active"
+                        data-mode="LAB"
+                    >
+                        LAB
+                    </button>
+
+                    <button
+                        class="mode-btn"
+                        data-mode="PRODUCTION"
+                    >
+                        PRODUCTION
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="setup-plan"
+                    class="wizard-list"
+                ></div>
+
+            </div>
+
+        </section>
+
+
+        <section
+            id="page-sites"
+            class="page"
+        >
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Sites</h2>
+                        <p>Runtime and Manager registry</p>
+                    </div>
+                </div>
+
+                <pre id="sites-json"></pre>
+            </div>
+        </section>
+
+
+        <section
+            id="page-calibration"
+            class="page"
+        >
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Calibration</h2>
+                        <p>Active calibration discovery</p>
+                    </div>
+                </div>
+
+                <div
+                    id="calibration-grid"
+                    class="status-grid"
+                ></div>
+            </div>
+        </section>
+
+
+        <section
+            id="page-tests"
+            class="page"
+        >
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Test Center</h2>
+                        <p>
+                            Runtime test actions arrive in Phase 2C
+                        </p>
+                    </div>
+                </div>
+
+                <div class="test-grid">
+                    <div class="test">Camera</div>
+                    <div class="test">RTSP</div>
+                    <div class="test">PTZ</div>
+                    <div class="test">AI</div>
+                    <div class="test">CENTER → EDGE</div>
+                    <div class="test">EDGE → CENTER</div>
+                    <div class="test">Full Sweep</div>
+                    <div class="test">Preflight</div>
+                </div>
+            </div>
+        </section>
+
+
+        <section
+            id="page-events"
+            class="page"
+        >
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Events</h2>
+                        <p>
+                            Event history arrives in the next phase
+                        </p>
+                    </div>
+                </div>
+
+                <div class="empty">
+                    Event storage is not enabled yet.
+                </div>
+            </div>
+        </section>
+
+
+        <section
+            id="page-system"
+            class="page"
+        >
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>System</h2>
+                        <p>Server, network and services</p>
+                    </div>
+                </div>
+
+                <pre id="system-json"></pre>
+            </div>
+        </section>
+
+    </main>
+
+</div>
+
+
+<script src="/static/manager.js"></script>
+
+</body>
+</html>

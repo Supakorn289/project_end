@@ -1,0 +1,39 @@
+Smart Fire Detection v2 - Detection Test Summary
+Preset: 7
+Center Bearing: 270.0 deg
+
+Post-Stable AI Warm-up
+Warm-up is excluded from measured test frames and consensus.
+  Warm-up 1: 1410.6 ms
+  Warm-up 2: 346.5 ms
+  First: 1410.6 ms
+  Last: 346.5 ms
+  Median: 878.5 ms
+
+Measured AI Inference
+Warm-up samples are excluded.
+  Samples: 3
+  Mean: 385.8 ms
+  Median: 385.3 ms
+  Min: 377.8 ms
+  Max: 394.4 ms
+
+Frame 1: seq=168 inference=377.8 ms detections=2
+  - class=fire model_class='fire' conf=0.449 bbox=(853, 662, 920, 714) bearing=283.638° distance=2.114 m quality=calibrated gps=18.79286450, 98.98375651
+  - class=fire model_class='fire' conf=0.305 bbox=(859, 574, 906, 636) bearing=283.159° distance=2.507 m quality=calibrated gps=18.79286516, 98.98375284
+
+Frame 2: seq=181 inference=385.3 ms detections=3
+  - class=fire model_class='fire' conf=0.498 bbox=(853, 663, 920, 713) bearing=283.638° distance=2.118 m quality=calibrated gps=18.79286451, 98.98375647
+  - class=fire model_class='fire' conf=0.491 bbox=(856, 576, 905, 636) bearing=283.039° distance=2.507 m quality=calibrated gps=18.79286511, 98.98375283
+  - class=fire model_class='fire' conf=0.466 bbox=(854, 664, 919, 700) bearing=283.618° distance=2.175 m quality=calibrated gps=18.79286463, 98.98375595
+
+Frame 3: seq=195 inference=394.4 ms detections=3
+  - class=fire model_class='fire' conf=0.495 bbox=(853, 664, 920, 714) bearing=283.642° distance=2.114 m quality=calibrated gps=18.79286450, 98.98375651
+  - class=fire model_class='fire' conf=0.399 bbox=(858, 577, 906, 637) bearing=283.133° distance=2.502 m quality=calibrated gps=18.79286513, 98.98375289
+  - class=fire model_class='fire' conf=0.388 bbox=(854, 665, 919, 697) bearing=283.614° distance=2.189 m quality=calibrated gps=18.79286465, 98.98375582
+
+Consensus result
+  - confirmed detections: 3
+    * class=fire conf=0.498 bbox=(853, 663, 920, 713) bearing=283.638° distance=2.118 m quality=calibrated gps=18.79286451, 98.98375647
+    * class=fire conf=0.491 bbox=(856, 576, 905, 636) bearing=283.039° distance=2.507 m quality=calibrated gps=18.79286511, 98.98375283
+    * class=fire conf=0.466 bbox=(854, 664, 919, 700) bearing=283.618° distance=2.175 m quality=calibrated gps=18.79286463, 98.98375595

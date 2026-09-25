@@ -1,0 +1,9 @@
+{
+  "site_id": "current-site-20260921",
+  "active_file": "/opt/smart-fire-detection-v2/calibration/sites/current-site-20260921/preset_rotation.json",
+  "sha256": "1b22ec27e512aafa49244287f9811e07cefb4e0cd653210854495ee4b2f02917",
+  "format": "smart-fire-preset-rotation-MIXED-AB-v3",
+  "status": "PASS_CANDIDATE_NOT_INSTALLED",
+  "model": "calibrated-global-raw-ray-rotation",
+  "holdout_passed": true
+}

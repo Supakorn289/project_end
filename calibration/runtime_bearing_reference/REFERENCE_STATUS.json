@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "reference_role": "static_bearing_reference",
+  "relative_azimuth_geometry": {
+    "validated": true,
+    "raw_horizontal_loop_closure_deg": 1.0306,
+    "target_cross_preset_deg": "approximately 1-2 deg",
+    "status": "PASS_FOR_CROSS_PRESET_VALIDATION"
+  },
+  "full_3d_pose_graph": {
+    "validated": false,
+    "closure_error_deg": 11.1859,
+    "used_for_runtime_bearing": false
+  },
+  "absolute_world_bearing": {
+    "validated": false,
+    "reason": "P1 frozen optical reference has not yet been re-anchored to absolute north"
+  },
+  "dynamic_ptz_correction": {
+    "validated": false,
+    "reason": "current preset arrival still requires current-vs-reference optical shift correction"
+  },
+  "distance_calibration": {
+    "modified_by_this_calibration": false
+  },
+  "physical_preset_bearings": {
+    "modified": false
+  }
+}

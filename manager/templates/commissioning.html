@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="th">
+
+<head>
+<meta charset="utf-8">
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>
+Smart Fire Commissioning
+</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+ margin:0;
+ background:#090f17;
+ color:#f5f7fb;
+ font-family:system-ui,sans-serif
+}
+
+main{
+ width:min(1100px,calc(100% - 30px));
+ margin:auto;
+ padding:28px 0 60px
+}
+
+a{color:#8dbdff}
+
+.toolbar,.step,.console,.auth{
+ background:#111b29;
+ border:1px solid #29394e;
+ border-radius:14px
+}
+
+.toolbar,.auth{
+ padding:16px;
+ margin:18px 0;
+ display:flex;
+ gap:12px;
+ flex-wrap:wrap;
+ align-items:center
+}
+
+select,input{
+ background:#0b131e;
+ color:white;
+ border:1px solid #34475f;
+ border-radius:8px;
+ padding:9px
+}
+
+#steps{
+ display:grid;
+ gap:11px
+}
+
+.step{
+ padding:17px;
+ display:grid;
+ grid-template-columns:50px 1fr;
+ gap:13px
+}
+
+.number{
+ width:42px;
+ height:42px;
+ border-radius:50%;
+ display:grid;
+ place-items:center;
+ background:#1d3452;
+ font-weight:800
+}
+
+.title{
+ font-size:17px;
+ font-weight:750
+}
+
+.meta{
+ color:#90a0b6;
+ font-size:13px;
+ margin-top:5px
+}
+
+.actions{
+ display:flex;
+ gap:7px;
+ flex-wrap:wrap;
+ margin-top:12px
+}
+
+button,.button{
+ border:0;
+ border-radius:8px;
+ padding:8px 11px;
+ background:#327fe8;
+ color:white;
+ cursor:pointer;
+ text-decoration:none;
+ font-size:13px
+}
+
+button.secondary{
+ background:#29384c
+}
+
+.badge{
+ display:inline-block;
+ border:1px solid #39506d;
+ border-radius:99px;
+ padding:5px 9px;
+ font-size:11px;
+ margin-top:8px
+}
+
+.REQUIRED{color:#ffca67}
+.REUSE_OR_RECALIBRATE{color:#63d994}
+.OPTIONAL,.OPTIONAL_CHECK{color:#9aa9bd}
+.RECOMMENDED{color:#7db7ff}
+
+.console{
+ margin-top:20px;
+ padding:16px
+}
+
+pre{
+ white-space:pre-wrap;
+ word-break:break-word;
+ background:#080d14;
+ padding:14px;
+ border-radius:9px;
+ max-height:500px;
+ overflow:auto
+}
+
+.hidden{display:none}
+
+@media(max-width:650px){
+ .step{grid-template-columns:42px 1fr}
+}
+</style>
+</head>
+
+
+<body>
+
+<main>
+
+<a href="/">
+← หน้าแรก
+</a>
+
+<h1>
+Commissioning Workflow
+</h1>
+
+<p>
+หน้านี้เป็นตัวควบคุมเครื่องมือเดิมของระบบ
+ไม่ได้สร้าง Camera / PTZ / AI / Calibration engine
+อีกชุดขึ้นมาใหม่
+</p>
+
+
+<div class="toolbar">
+
+<label>
+Installation
+<select id="installation">
+<option value="EXISTING">
+ใช้พื้นที่เดิม
+</option>
+<option value="NEW">
+พื้นที่ใหม่
+</option>
+</select>
+</label>
+
+
+<label>
+Mode
+<select id="mode">
+<option value="LAB">LAB</option>
+<option value="PRODUCTION">
+PRODUCTION
+</option>
+</select>
+</label>
+
+</div>
+
+
+<div
+ id="authBox"
+ class="auth hidden"
+>
+
+<span>
+ต้อง Unlock ก่อนใช้คำสั่งที่มีผลกับระบบ
+</span>
+
+<input
+ id="token"
+ type="password"
+ placeholder="Manager Token"
+>
+
+<button id="unlock">
+Unlock
+</button>
+
+<a href="/settings">
+Settings
+</a>
+
+</div>
+
+
+<div id="steps"></div>
+
+
+<div class="console">
+
+<b>
+Tool Result / Preview
+</b>
+
+<pre id="output">
+ยังไม่ได้เรียกเครื่องมือ
+</pre>
+
+</div>
+
+</main>
+
+
+<script>
+
+let catalog = {};
+let csrf = null;
+
+
+const params =
+ new URLSearchParams(
+   location.search
+ );
+
+
+const installation =
+ document.getElementById(
+   "installation"
+ );
+
+
+const mode =
+ document.getElementById(
+   "mode"
+ );
+
+
+installation.value =
+ params.get(
+   "installation"
+ )
+ || "EXISTING";
+
+
+mode.value =
+ params.get(
+   "mode"
+ )
+ || "LAB";
+
+
+function output(
+ value
+){
+ document.getElementById(
+   "output"
+ ).textContent =
+   typeof value === "string"
+   ? value
+   : JSON.stringify(
+       value,
+       null,
+       2
+     );
+}
+
+
+async function jsonRequest(
+ url,
+ options={}
+){
+
+ options.headers = {
+   ...(options.headers || {}),
+   "Content-Type":
+     "application/json"
+ };
+
+
+ if(csrf){
+   options.headers[
+     "X-CSRF-Token"
+   ] = csrf;
+ }
+
+
+ const response =
+   await fetch(
+     url,
+     options
+   );
+
+
+ const data =
+   await response.json();
+
+
+ if(!response.ok){
+   throw new Error(
+     JSON.stringify(
+       data,
+       null,
+       2
+     )
+   );
+ }
+
+
+ return data;
+}
+
+
+async function session(){
+
+ const data =
+   await jsonRequest(
+     "/api/auth/session"
+   );
+
+
+ if(data.authenticated){
+   csrf = data.csrf;
+
+   document.getElementById(
+     "authBox"
+   ).classList.add(
+     "hidden"
+   );
+ }else{
+   document.getElementById(
+     "authBox"
+   ).classList.remove(
+     "hidden"
+   );
+ }
+}
+
+
+document.getElementById(
+ "unlock"
+).onclick =
+async()=>{
+
+ try{
+
+   const data =
+     await jsonRequest(
+       "/api/auth/login",
+       {
+         method:"POST",
+         body:JSON.stringify({
+           token:
+             document
+             .getElementById(
+               "token"
+             )
+             .value
+             .trim()
+         })
+       }
+     );
+
+
+   csrf = data.csrf;
+
+
+   document.getElementById(
+     "token"
+   ).value = "";
+
+
+   document.getElementById(
+     "authBox"
+   ).classList.add(
+     "hidden"
+   );
+
+
+   output(
+     "Manager unlocked"
+   );
+
+ }catch(error){
+
+   output(
+     String(error)
+   );
+ }
+};
+
+
+function toolButtons(
+ toolId
+){
+
+ const tool =
+   catalog[
+     toolId
+   ];
+
+
+ if(!tool){
+   return "";
+ }
+
+
+ if(
+   tool.kind
+   === "ui_adapter"
+ ){
+
+   return `
+     <a
+       class="button"
+       href="${tool.route}"
+     >
+       เปิด Wizard
+     </a>
+   `;
+ }
+
+
+ return `
+   <button
+     class="secondary"
+     onclick="previewTool('${toolId}')"
+   >
+     รายละเอียด
+   </button>
+
+   <button
+     onclick="runTool('${toolId}')"
+   >
+     Run
+   </button>
+ `;
+}
+
+
+function renderStep(
+ step
+){
+
+ let toolIds = [];
+
+
+ if(step.tool){
+   toolIds = [
+     step.tool
+   ];
+ }
+
+
+ if(step.tools){
+   toolIds =
+     step.tools;
+ }
+
+
+ const actions =
+   toolIds
+   .map(
+     toolButtons
+   )
+   .join("");
+
+
+ let routeAction = "";
+
+
+ if(
+   step.route
+   &&
+   toolIds.length === 0
+ ){
+
+   routeAction = `
+     <a
+       class="button"
+       href="${step.route}"
+     >
+       เปิด
+     </a>
+   `;
+ }
+
+
+ return `
+ <div class="step">
+
+   <div class="number">
+     ${step.number}
+   </div>
+
+   <div>
+
+     <div class="title">
+       ${step.title}
+     </div>
+
+     <div
+       class="badge ${step.policy}"
+     >
+       ${step.policy}
+     </div>
+
+     <div class="actions">
+       ${actions}
+       ${routeAction}
+     </div>
+
+   </div>
+
+ </div>
+ `;
+}
+
+
+async function load(){
+
+ const query =
+   new URLSearchParams({
+     installation:
+       installation.value,
+
+     mode:
+       mode.value,
+   });
+
+
+ const [
+   catalogData,
+   workflow
+ ] =
+ await Promise.all([
+   jsonRequest(
+     "/api/commissioning/catalog"
+   ),
+
+   jsonRequest(
+     "/api/commissioning/workflow?"
+     + query.toString()
+   )
+ ]);
+
+
+ catalog =
+   catalogData.tools
+   || {};
+
+
+ document.getElementById(
+   "steps"
+ ).innerHTML =
+   workflow.steps
+   .map(
+     renderStep
+   )
+   .join("");
+}
+
+
+window.previewTool =
+async toolId=>{
+
+ try{
+
+   const data =
+     await jsonRequest(
+       `/api/commissioning/tool/${toolId}/plan`
+     );
+
+   output(
+     data
+   );
+
+ }catch(error){
+
+   output(
+     String(error)
+   );
+ }
+};
+
+
+window.runTool =
+async toolId=>{
+
+ if(!csrf){
+
+   document.getElementById(
+     "authBox"
+   ).classList.remove(
+     "hidden"
+   );
+
+   output(
+     "กรุณา Unlock Manager ก่อน"
+   );
+
+   return;
+ }
+
+
+ const plan =
+   await jsonRequest(
+     `/api/commissioning/tool/${toolId}/plan`
+   );
+
+
+ let message =
+   `Run ${plan.label}?`;
+
+
+ if(
+   plan.warnings
+   &&
+   plan.warnings.length
+ ){
+
+   message +=
+     "\n\n"
+     +
+     plan.warnings.join(
+       "\n"
+     );
+ }
+
+
+ if(
+   !confirm(
+     message
+   )
+ ){
+   return;
+ }
+
+
+ output(
+   `Running ${plan.label}...`
+ );
+
+
+ try{
+
+   const result =
+     await jsonRequest(
+       `/api/commissioning/tool/${toolId}/run`,
+       {
+         method:"POST",
+
+         body:JSON.stringify({
+           confirm:true
+         })
+       }
+     );
+
+
+   output(
+     result
+   );
+
+
+ }catch(error){
+
+   output(
+     String(error)
+   );
+ }
+};
+
+
+installation.onchange =
+mode.onchange =
+ load;
+
+
+Promise.all([
+ session(),
+ load(),
+]).catch(
+ error=>output(
+   String(error)
+ )
+);
+
+</script>
+
+</body>
+</html>

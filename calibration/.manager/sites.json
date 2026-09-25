@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "sites": {
+    "current-site-20260921": {
+      "components": {
+        "camera": "UNKNOWN",
+        "cross_preset": "ACTIVE",
+        "distance": "CALIBRATED_UNVERIFIED",
+        "gps": "DISABLED",
+        "intrinsics": "UNKNOWN",
+        "preset_geometry": "ACTIVE",
+        "site_bearing": "DEFERRED"
+      },
+      "created_at": "2026-09-23T06:31:45.033212+00:00",
+      "display_name": "Current Experimental Site",
+      "lifecycle": "ACTIVE",
+      "mode": "LAB",
+      "rotation_metadata_status": "PASS_CANDIDATE_NOT_INSTALLED",
+      "runtime_active": true,
+      "site_dir": "/opt/smart-fire-detection-v2/calibration/sites/current-site-20260921",
+      "site_id": "current-site-20260921",
+      "source": "LEGACY_RUNTIME_IMPORT",
+      "updated_at": "2026-09-23T06:31:45.033216+00:00",
+      "validation_state": "CANDIDATE",
+      "warnings": [
+        "Rotation is runtime-active but legacy metadata says NOT_INSTALLED."
+      ]
+    },
+    "test-site-manager": {
+      "components": {
+        "camera": "UNKNOWN",
+        "cross_preset": "UNKNOWN",
+        "distance": "DEFERRED",
+        "gps": "DISABLED",
+        "intrinsics": "UNKNOWN",
+        "preset_geometry": "UNKNOWN",
+        "site_bearing": "DEFERRED"
+      },
+      "created_at": "2026-09-23T06:33:33.521553+00:00",
+      "display_name": "Manager Test Site",
+      "lifecycle": "DRAFT",
+      "mode": "LAB",
+      "rotation_metadata_status": null,
+      "runtime_active": false,
+      "site_dir": null,
+      "site_id": "test-site-manager",
+      "source": "MANAGER",
+      "updated_at": "2026-09-23T06:34:01.718749+00:00",
+      "validation_state": "DRAFT",
+      "warnings": []
+    }
+  },
+  "updated_at": "2026-09-23T06:34:01.718777+00:00"
+}

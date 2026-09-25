@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "created_at": 1788758144.9099114,
+  "run_dir": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544",
+  "repeats": 3,
+  "targets": {
+    "7": [
+      6,
+      8
+    ],
+    "8": [
+      7,
+      9
+    ]
+  },
+  "captures": [
+    {
+      "target": 7,
+      "approach": 6,
+      "repeat": 1,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P7_from_P6_R01.jpg",
+      "seq": 321,
+      "frame_timestamp": 1788758155.4691668,
+      "saved_at": 1788758155.4823709
+    },
+    {
+      "target": 7,
+      "approach": 8,
+      "repeat": 1,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P7_from_P8_R01.jpg",
+      "seq": 559,
+      "frame_timestamp": 1788758164.9957464,
+      "saved_at": 1788758165.0085828
+    },
+    {
+      "target": 7,
+      "approach": 6,
+      "repeat": 2,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P7_from_P6_R02.jpg",
+      "seq": 798,
+      "frame_timestamp": 1788758174.5611293,
+      "saved_at": 1788758174.5735946
+    },
+    {
+      "target": 7,
+      "approach": 8,
+      "repeat": 2,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P7_from_P8_R02.jpg",
+      "seq": 1037,
+      "frame_timestamp": 1788758184.1211896,
+      "saved_at": 1788758184.1336393
+    },
+    {
+      "target": 7,
+      "approach": 6,
+      "repeat": 3,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P7_from_P6_R03.jpg",
+      "seq": 1276,
+      "frame_timestamp": 1788758193.6909492,
+      "saved_at": 1788758193.703663
+    },
+    {
+      "target": 7,
+      "approach": 8,
+      "repeat": 3,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P7_from_P8_R03.jpg",
+      "seq": 1514,
+      "frame_timestamp": 1788758203.217083,
+      "saved_at": 1788758203.2299972
+    },
+    {
+      "target": 8,
+      "approach": 7,
+      "repeat": 1,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P8_from_P7_R01.jpg",
+      "seq": 1679,
+      "frame_timestamp": 1788758209.811867,
+      "saved_at": 1788758209.8234181
+    },
+    {
+      "target": 8,
+      "approach": 9,
+      "repeat": 1,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P8_from_P9_R01.jpg",
+      "seq": 1909,
+      "frame_timestamp": 1788758219.0167527,
+      "saved_at": 1788758219.028395
+    },
+    {
+      "target": 8,
+      "approach": 7,
+      "repeat": 2,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P8_from_P7_R02.jpg",
+      "seq": 2148,
+      "frame_timestamp": 1788758228.572346,
+      "saved_at": 1788758228.5841103
+    },
+    {
+      "target": 8,
+      "approach": 9,
+      "repeat": 2,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P8_from_P9_R02.jpg",
+      "seq": 2379,
+      "frame_timestamp": 1788758237.8119233,
+      "saved_at": 1788758237.8234217
+    },
+    {
+      "target": 8,
+      "approach": 7,
+      "repeat": 3,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P8_from_P7_R03.jpg",
+      "seq": 2617,
+      "frame_timestamp": 1788758247.3316588,
+      "saved_at": 1788758247.3434572
+    },
+    {
+      "target": 8,
+      "approach": 9,
+      "repeat": 3,
+      "path": "/opt/smart-fire-detection-v2/calibration/ptz_repeatability_v1/run_20260907_121544/images/P8_from_P9_R03.jpg",
+      "seq": 2847,
+      "frame_timestamp": 1788758256.52948,
+      "saved_at": 1788758256.5409606
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "status": "candidate",
+  "reference_dir": "/home/fire/bearing_reference_work_20260908_141707",
+  "method": "robust_pairwise_3d_rotation_horizontal_component_plus_1d_circular_least_squares",
+  "anchor": {
+    "preset": 1,
+    "relative_azimuth_deg": 0.0,
+    "absolute_north_validated": false
+  },
+  "raw_loop": {
+    "p1_to_p5_deg": 176.7139,
+    "p1_to_p9_deg": 183.48790000000002,
+    "predicted_p5_to_p9_deg": 6.774000000000029,
+    "direct_p5_to_p9_deg": 7.8045999999999935,
+    "closure_error_deg": 1.0305999999999642
+  },
+  "fit": {
+    "rank": 8,
+    "edge_rmse_deg": 0.11451111111110714,
+    "edge_max_abs_residual_deg": 0.11451111111119872,
+    "quality": "PASS_FOR_CROSS_PRESET_VALIDATION"
+  },
+  "presets": {
+    "1": {
+      "measured_bearing_deg": 0.0,
+      "reference_relative_azimuth_deg": 0.0,
+      "reference_minus_measured_deg": 0.0
+    },
+    "2": {
+      "measured_bearing_deg": 45.0,
+      "reference_relative_azimuth_deg": 42.804088888888835,
+      "reference_minus_measured_deg": -2.1959111111111724
+    },
+    "3": {
+      "measured_bearing_deg": 90.0,
+      "reference_relative_azimuth_deg": 89.2281777777777,
+      "reference_minus_measured_deg": -0.7718222222222835
+    },
+    "4": {
+      "measured_bearing_deg": 135.0,
+      "reference_relative_azimuth_deg": 134.5867666666665,
+      "reference_minus_measured_deg": -0.4132333333334941
+    },
+    "5": {
+      "measured_bearing_deg": 177.5,
+      "reference_relative_azimuth_deg": 176.25585555555534,
+      "reference_minus_measured_deg": -1.2441444444446574
+    },
+    "6": {
+      "measured_bearing_deg": 315.0,
+      "reference_relative_azimuth_deg": 318.04521111111114,
+      "reference_minus_measured_deg": 3.0452111111111435
+    },
+    "7": {
+      "measured_bearing_deg": 270.0,
+      "reference_relative_azimuth_deg": 270.250922222222,
+      "reference_minus_measured_deg": 0.250922222222016
+    },
+    "8": {
+      "measured_bearing_deg": 225.0,
+      "reference_relative_azimuth_deg": 229.3355333333331,
+      "reference_minus_measured_deg": 4.335533333333103
+    },
+    "9": {
+      "measured_bearing_deg": 182.5,
+      "reference_relative_azimuth_deg": 183.9459444444443,
+      "reference_minus_measured_deg": 1.445944444444308
+    }
+  },
+  "edges": [
+    {
+      "a": 1,
+      "b": 2,
+      "axis_h": -42.9186,
+      "rmse": 0.2534,
+      "inlier_ratio": 0.8,
+      "raw_delta_deg": 42.9186,
+      "unwrapped_delta_deg": 42.9186,
+      "measured_branch_delta_deg": 45.0,
+      "optimized_delta_deg": 42.804088888888835,
+      "graph_residual_deg": -0.11451111111116319
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "axis_h": -46.5386,
+      "rmse": 0.2724,
+      "inlier_ratio": 0.917,
+      "raw_delta_deg": 46.5386,
+      "unwrapped_delta_deg": 46.5386,
+      "measured_branch_delta_deg": 45.0,
+      "optimized_delta_deg": 46.42408888888887,
+      "graph_residual_deg": -0.11451111111113477
+    },
+    {
+      "a": 3,
+      "b": 4,
+      "axis_h": -45.4731,
+      "rmse": 0.363,
+      "inlier_ratio": 0.875,
+      "raw_delta_deg": 45.47309999999999,
+      "unwrapped_delta_deg": 45.47309999999999,
+      "measured_branch_delta_deg": 45.0,
+      "optimized_delta_deg": 45.358588888888804,
+      "graph_residual_deg": -0.1145111111111845
+    },
+    {
+      "a": 4,
+      "b": 5,
+      "axis_h": -41.7836,
+      "rmse": 0.302,
+      "inlier_ratio": 1.0,
+      "raw_delta_deg": 41.78360000000001,
+      "unwrapped_delta_deg": 41.78360000000001,
+      "measured_branch_delta_deg": 42.5,
+      "optimized_delta_deg": 41.66908888888884,
+      "graph_residual_deg": -0.1145111111111703
+    },
+    {
+      "a": 1,
+      "b": 6,
+      "axis_h": 42.0693,
+      "rmse": 0.3406,
+      "inlier_ratio": 0.923,
+      "raw_delta_deg": -42.0693,
+      "unwrapped_delta_deg": 317.9307,
+      "measured_branch_delta_deg": 315.0,
+      "optimized_delta_deg": 318.04521111111114,
+      "graph_residual_deg": 0.11451111111114187
+    },
+    {
+      "a": 6,
+      "b": 7,
+      "axis_h": 47.9088,
+      "rmse": 0.3792,
+      "inlier_ratio": 1.0,
+      "raw_delta_deg": -47.908799999999985,
+      "unwrapped_delta_deg": -47.908799999999985,
+      "measured_branch_delta_deg": -45.0,
+      "optimized_delta_deg": -47.79428888888913,
+      "graph_residual_deg": 0.11451111111085766
+    },
+    {
+      "a": 7,
+      "b": 8,
+      "axis_h": 41.0299,
+      "rmse": 0.3694,
+      "inlier_ratio": 0.917,
+      "raw_delta_deg": -41.0299,
+      "unwrapped_delta_deg": -41.0299,
+      "measured_branch_delta_deg": -45.0,
+      "optimized_delta_deg": -40.91538888888891,
+      "graph_residual_deg": 0.11451111111108503
+    },
+    {
+      "a": 8,
+      "b": 9,
+      "axis_h": 45.5041,
+      "rmse": 0.3144,
+      "inlier_ratio": 1.0,
+      "raw_delta_deg": -45.504099999999994,
+      "unwrapped_delta_deg": -45.504099999999994,
+      "measured_branch_delta_deg": -42.5,
+      "optimized_delta_deg": -45.389588888888795,
+      "graph_residual_deg": 0.11451111111119872
+    },
+    {
+      "a": 5,
+      "b": 9,
+      "axis_h": -7.8046,
+      "rmse": 0.411,
+      "inlier_ratio": 0.864,
+      "raw_delta_deg": 7.8045999999999935,
+      "unwrapped_delta_deg": 7.8045999999999935,
+      "measured_branch_delta_deg": 5.0,
+      "optimized_delta_deg": 7.690088888888965,
+      "graph_residual_deg": -0.11451111111102819
+    }
+  ],
+  "notes": [
+    "Physical PRESET_BEARING_DEG values remain unchanged.",
+    "Measured preset values are used only for 360-degree branch unwrapping and comparison.",
+    "This artifact is relative geometry only.",
+    "Absolute world bearing still requires P1/north reference validation.",
+    "Do not modify distance calibration from this artifact."
+  ]
+}

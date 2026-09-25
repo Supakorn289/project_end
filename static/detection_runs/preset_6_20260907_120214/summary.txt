@@ -1,0 +1,32 @@
+Smart Fire Detection v2 - Detection Test Summary
+Preset: 6
+Center Bearing: 315.0 deg
+
+Post-Stable AI Warm-up
+Warm-up is excluded from measured test frames and consensus.
+  Warm-up 1: 1408.8 ms
+  Warm-up 2: 340.9 ms
+  First: 1408.8 ms
+  Last: 340.9 ms
+  Median: 874.9 ms
+
+Measured AI Inference
+Warm-up samples are excluded.
+  Samples: 3
+  Mean: 378.3 ms
+  Median: 395.9 ms
+  Min: 341.1 ms
+  Max: 397.8 ms
+
+Frame 1: seq=129 inference=341.1 ms detections=1
+  - class=fire model_class='fire' conf=0.494 bbox=(500, 583, 533, 623) bearing=305.872° distance=2.588 m quality=calibrated gps=18.79287370, 98.98375611
+
+Frame 2: seq=141 inference=395.9 ms detections=1
+  - class=fire model_class='fire' conf=0.546 bbox=(500, 583, 533, 622) bearing=305.872° distance=2.594 m quality=calibrated gps=18.79287373, 98.98375606
+
+Frame 3: seq=155 inference=397.8 ms detections=1
+  - class=fire model_class='fire' conf=0.542 bbox=(500, 583, 533, 622) bearing=305.872° distance=2.594 m quality=calibrated gps=18.79287373, 98.98375606
+
+Consensus result
+  - confirmed detections: 1
+    * class=fire conf=0.546 bbox=(500, 583, 533, 622) bearing=305.872° distance=2.594 m quality=calibrated gps=18.79287373, 98.98375606

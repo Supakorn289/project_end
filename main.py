@@ -51,6 +51,9 @@ from overlay import (
 )
 
 from ptz import PTZController
+from preset_geometry import get_runtime_preset_rotation
+from cross_preset_fusion import CrossPresetObjectFusion
+from alert_finalizer import PendingAlertBuffer
 
 
 # ============================================================
@@ -350,6 +353,14 @@ def warm_up_detector(
         detector.detect(
             packet.frame,
             warmup_preset,
+
+            # Warm-up must use the same location-safety
+            # contract as the production scan.
+            apply_north_offset=ENABLE_TRUE_NORTH,
+            allow_gps=(
+                ENABLE_GPS
+                and ENABLE_TRUE_NORTH
+            ),
         )
 
         infer_ms = (
@@ -574,18 +585,24 @@ def detection_to_dict(
 
 class AlertDeduplicator:
     """
-    Event-based alert cooldown.
+    Event-based alert cooldown with cross-preset object identity.
 
-    Same event:
-    - same canonical class
-    - same preset
-    - bounding boxes overlap >= IoU threshold
+    Priority:
 
-    Different preset:
-    - different event
+    1. If both detections have object_id:
+         same object_id
+             -> same event across presets
 
-    Different object inside same preset:
-    - different event when IoU is low
+    2. If object_id is unavailable:
+         fallback to legacy
+         class + same preset + bbox IoU
+
+    This allows:
+
+        P1 CENTER Fire1 -> OBJ-0001
+        P2 EDGE   Fire1 -> OBJ-0001
+
+    to remain one logical alert event.
     """
 
     def __init__(
@@ -610,7 +627,6 @@ class AlertDeduplicator:
             <= self.iou_threshold
             <= 1.0
         ):
-
             raise ValueError(
                 "ALERT_DEDUP_IOU_THRESHOLD "
                 "must be between 0 and 1"
@@ -619,27 +635,71 @@ class AlertDeduplicator:
         self.events = []
 
 
+    @staticmethod
+    def _object_id(
+        detection,
+    ):
+        value = getattr(
+            detection,
+            "object_id",
+            None,
+        )
+
+        if value is None:
+            return None
+
+        value = str(
+            value
+        ).strip()
+
+        return (
+            value
+            if value
+            else None
+        )
+
+
     def _purge(
         self,
         now_mono,
     ):
-        """
-        Remove expired cooldown events.
-        """
-
         self.events = [
-
             event
-
             for event
             in self.events
-
             if (
                 now_mono
                 - event["alerted_at"]
                 < self.cooldown_sec
             )
         ]
+
+
+    def _duplicate_result(
+        self,
+        event,
+        now_mono,
+        reason,
+    ):
+        remaining = max(
+            0.0,
+            self.cooldown_sec
+            - (
+                now_mono
+                - event[
+                    "alerted_at"
+                ]
+            ),
+        )
+
+        return (
+            False,
+            (
+                f"{reason} "
+                f"remaining="
+                f"{remaining:.1f}s"
+            ),
+        )
 
 
     def should_alert(
@@ -653,23 +713,25 @@ class AlertDeduplicator:
 
             (True, "new_event")
 
-        หรือ
-
-            (
-                False,
-                "duplicate IoU=... remaining=...s"
-            )
+        or duplicate reason.
         """
 
         self._purge(
             now_mono
         )
 
+        detection_object_id = (
+            self._object_id(
+                detection
+            )
+        )
+
+
         for event in self.events:
 
-            # ------------------------------------------------
-            # Different class
-            # ------------------------------------------------
+            # ---------------------------------------------
+            # Class must match
+            # ---------------------------------------------
 
             if (
                 event["class"]
@@ -678,11 +740,66 @@ class AlertDeduplicator:
                 continue
 
 
-            # ------------------------------------------------
-            # Different preset
-            #
-            # จะไม่ถูก cooldown ข้ามกัน
-            # ------------------------------------------------
+            event_object_id = (
+                event.get(
+                    "object_id"
+                )
+            )
+
+
+            # =============================================
+            # Primary:
+            # logical object identity across presets
+            # =============================================
+
+            if (
+                detection_object_id
+                is not None
+                and
+                event_object_id
+                is not None
+            ):
+
+                if (
+                    detection_object_id
+                    != event_object_id
+                ):
+                    #
+                    # Both have identity and disagree:
+                    # they are different objects.
+                    #
+                    continue
+
+
+                event["bbox"] = tuple(
+                    detection.bbox
+                )
+
+                event["preset"] = int(
+                    preset
+                )
+
+                event["last_seen"] = (
+                    now_mono
+                )
+
+                return (
+                    self._duplicate_result(
+                        event,
+                        now_mono,
+                        (
+                            "duplicate-object "
+                            f"id="
+                            f"{detection_object_id}"
+                        ),
+                    )
+                )
+
+
+            # =============================================
+            # Legacy fallback:
+            # same preset + bbox IoU
+            # =============================================
 
             if (
                 event["preset"]
@@ -691,25 +808,16 @@ class AlertDeduplicator:
                 continue
 
 
-            # ------------------------------------------------
-            # Spatial comparison
-            # ------------------------------------------------
-
             iou = bbox_iou(
                 event["bbox"],
                 detection.bbox,
             )
 
+
             if (
                 iou
                 >= self.iou_threshold
             ):
-
-                # Update bbox to latest
-                # เพื่อรองรับวัตถุขยับเล็กน้อย
-                #
-                # ไม่ Update alerted_at
-                # เพราะไม่ต้องการต่อ Cooldown
 
                 event["bbox"] = tuple(
                     detection.bbox
@@ -719,26 +827,17 @@ class AlertDeduplicator:
                     now_mono
                 )
 
-                remaining = max(
-                    0.0,
-                    self.cooldown_sec
-                    - (
-                        now_mono
-                        - event[
-                            "alerted_at"
-                        ]
-                    ),
+                return (
+                    self._duplicate_result(
+                        event,
+                        now_mono,
+                        (
+                            "duplicate-legacy "
+                            f"IoU={iou:.3f}"
+                        ),
+                    )
                 )
 
-                return (
-                    False,
-                    (
-                        "duplicate "
-                        f"IoU={iou:.3f} "
-                        f"remaining="
-                        f"{remaining:.1f}s"
-                    ),
-                )
 
         return (
             True,
@@ -753,7 +852,7 @@ class AlertDeduplicator:
         now_mono,
     ):
         """
-        Register a newly alerted event.
+        Register a newly alerted logical object/event.
         """
 
         self.events.append(
@@ -763,7 +862,15 @@ class AlertDeduplicator:
                     .canonical_class
                 ),
 
-                "preset": preset,
+                "object_id": (
+                    self._object_id(
+                        detection
+                    )
+                ),
+
+                "preset": int(
+                    preset
+                ),
 
                 "bbox": tuple(
                     detection.bbox
@@ -778,6 +885,8 @@ class AlertDeduplicator:
                 ),
             }
         )
+
+
 
 
 # ============================================================
@@ -894,6 +1003,16 @@ def scan_preset(
         "stable_seq": None,
 
         "scan_ms": None,
+
+        "geometry_valid": False,
+
+        "geometry_method": (
+            "ACTIVE_ROTATION_3D"
+        ),
+
+        "geometry_quality": "INVALID",
+
+        "geometry_source": None,
     }
 
 
@@ -905,7 +1024,7 @@ def scan_preset(
     print(
         f"🔄 Move -> preset "
         f"{preset} "
-        f"| center="
+        f"| physical_center="
         f"{PRESET_BEARING_DEG[preset]:.1f}°"
     )
 
@@ -1052,6 +1171,82 @@ def scan_preset(
 
 
     # ========================================================
+    # Dynamic Site Rotation Geometry
+    # ========================================================
+    #
+    # Production geometry source:
+    #
+    # calibration/preset_rotation_ACTIVE.json
+    #
+    # The runtime automatically detects an atomic
+    # ACTIVE site swap and validates the new Q matrices.
+    #
+    # No reference image.
+    # No ORB/SIFT.
+    # No scene matching.
+    # ========================================================
+
+    try:
+
+        runtime_rotation = (
+            get_runtime_preset_rotation()
+        )
+
+        runtime_rotation.reload_if_changed()
+
+        info["geometry_valid"] = True
+
+        info["geometry_method"] = (
+            "ACTIVE_ROTATION_3D"
+        )
+
+        info["geometry_quality"] = (
+            "VALIDATED"
+        )
+
+        info["geometry_source"] = str(
+            runtime_rotation.resolved_path
+        )
+
+        print(
+            "🧭 Dynamic geometry ready "
+            f"| P{preset} "
+            "| method=ACTIVE_ROTATION_3D"
+        )
+
+    except Exception as exc:
+
+        info["geometry_valid"] = False
+
+        info["geometry_method"] = (
+            "ACTIVE_ROTATION_INVALID"
+        )
+
+        info["geometry_quality"] = (
+            "INVALID"
+        )
+
+        info["geometry_source"] = None
+
+        print(
+            "❌ Dynamic geometry invalid "
+            f"| P{preset} "
+            f"| {type(exc).__name__}: "
+            f"{exc}"
+        )
+
+        #
+        # Fail closed:
+        # do not continue AI/location processing
+        # with an invalid site calibration.
+        #
+        raise RuntimeError(
+            "Active preset rotation "
+            "calibration is invalid"
+        ) from exc
+
+
+    # ========================================================
     # AI scan
     # ========================================================
 
@@ -1111,6 +1306,18 @@ def scan_preset(
             detector.detect(
                 packet.frame,
                 preset,
+
+                # Relative bearing from:
+                # pixel -> calibrated ray -> ACTIVE Q[preset].
+                #
+                # Historical True-North remains locked.
+                apply_north_offset=ENABLE_TRUE_NORTH,
+
+                # True-North re-anchor is still pending.
+                allow_gps=(
+                ENABLE_GPS
+                and ENABLE_TRUE_NORTH
+            ),
             )
         )
 
@@ -1188,6 +1395,32 @@ def scan_preset(
 
 
     # ========================================================
+    # Geometry safety
+    # ========================================================
+
+    if not info[
+        "geometry_valid"
+    ]:
+
+        if confirmed:
+
+            print(
+                "⚠️ AI confirmed "
+                f"{len(confirmed)} detection(s), "
+                "but event output is suppressed "
+                "because geometry is invalid"
+            )
+
+        info[
+            "ai_confirmed_suppressed"
+        ] = len(
+            confirmed
+        )
+
+        confirmed = []
+
+
+    # ========================================================
     # GPS safety
     # ========================================================
 
@@ -1236,7 +1469,15 @@ def scan_preset(
     # Scan status
     # ========================================================
 
-    if (
+    if not info[
+        "geometry_valid"
+    ]:
+
+        info["status"] = (
+            "geometry_invalid"
+        )
+
+    elif (
         len(detection_sets)
         == FRAMES_PER_SCAN
     ):
@@ -1372,9 +1613,75 @@ def build_status(
     }
 
 
+
+# ============================================================
+# Site Location Feature Flags
+# ============================================================
+#
+# LAB default:
+#
+#   ENABLE_TRUE_NORTH=0
+#   ENABLE_GPS=0
+#
+# Real-site commissioning:
+#
+#   validate True North
+#   validate Distance
+#       ↓
+#   ENABLE_TRUE_NORTH=1
+#   ENABLE_GPS=1
+#
+# No source-code change is required when moving sites.
+# ============================================================
+
+def _env_flag(name, default=False):
+    value = os.getenv(
+        name,
+        "1" if default else "0",
+    ).strip().lower()
+
+    return value in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+ENABLE_TRUE_NORTH = _env_flag(
+    "ENABLE_TRUE_NORTH",
+    False,
+)
+
+ENABLE_GPS = _env_flag(
+    "ENABLE_GPS",
+    False,
+)
+
+
 # ============================================================
 # Main
 # ============================================================
+
+
+# === RUNTIME_LOCATION_FEATURE_FLAGS_V1 ===
+#
+# LAB:
+#   ENABLE_TRUE_NORTH=0
+#   ENABLE_GPS=0
+#
+# REAL SITE after commissioning:
+#   ENABLE_TRUE_NORTH=1
+#   ENABLE_GPS=1
+#
+# GPS is never allowed unless True North
+# is enabled as well.
+#
+
+
+
+
+
 
 def main():
 
@@ -1431,10 +1738,15 @@ def main():
     # Calibration state
     # ========================================================
 
-    site_bearing_calibrated = (
+    historical_site_calibration_exists = (
         SITE_CALIBRATION_FILE
         .exists()
     )
+
+    # Safety lock:
+    # Frozen P1 has not yet been re-anchored
+    # to Absolute True North.
+    site_bearing_calibrated = False
 
     if site_bearing_calibrated:
 
@@ -1528,6 +1840,51 @@ def main():
 
 
         # ====================================================
+        # Dynamic Site Rotation Geometry
+        # ====================================================
+
+        print(
+            "\n🧭 กำลังโหลด "
+            "Dynamic Site Rotation..."
+        )
+
+        runtime_rotation = (
+            get_runtime_preset_rotation()
+        )
+
+        runtime_rotation.reload(
+            force=True
+        )
+
+        print(
+            "✅ Dynamic Site Rotation พร้อม"
+        )
+
+        print(
+            "   ACTIVE : "
+            f"{runtime_rotation.resolved_path}"
+        )
+
+        print(
+            "   Model  : "
+            f"{runtime_rotation.metadata.get('model')}"
+        )
+
+        print(
+            "   Status : "
+            f"{runtime_rotation.metadata.get('status')}"
+        )
+
+        print(
+            "   Holdout: "
+            f"{runtime_rotation.metadata.get(
+                'independent_holdout_gate',
+                {},
+            ).get('passed')}"
+        )
+
+
+        # ====================================================
         # Startup warm-up
         # ====================================================
 
@@ -1570,6 +1927,42 @@ def main():
                 ),
             )
         )
+
+        # ====================================================
+        # Cross-Preset Object Fusion
+        # ====================================================
+
+        cross_preset_fusion = (
+            CrossPresetObjectFusion()
+        )
+
+        pending_alerts = (
+            PendingAlertBuffer()
+        )
+
+        print(
+            "   Pending alert finalization: "
+            "PRESET_AWARE"
+        )
+
+        print(
+            "   Pending safety timeout: "
+            f"{pending_alerts.timeout_sec:.1f}s"
+        )
+
+        print(
+            "\n🧭 Cross-Preset Fusion ready"
+        )
+
+        print(
+            "   CENTER > TRANSITION > EDGE"
+        )
+
+        print(
+            "   Same object can reuse trusted "
+            "CENTER bearing/distance"
+        )
+
 
         print(
             "\n🔔 Alert system ready"
@@ -1829,6 +2222,46 @@ def main():
 
 
                 # =============================================
+                # Cross-Preset Object Fusion
+                # =============================================
+
+                if confirmed:
+
+                    confirmed = (
+                        cross_preset_fusion
+                        .fuse_batch(
+                            confirmed,
+                            preset,
+                            now_mono,
+                        )
+                    )
+
+                    for detection in confirmed:
+
+                        print(
+                            "🧩 Object fusion "
+                            f"| id="
+                            f"{getattr(detection, 'object_id', None)} "
+                            f"| zone="
+                            f"{getattr(detection, 'bearing_zone', None)} "
+                            f"| fused="
+                            f"{getattr(detection, 'measurement_fused', False)} "
+                            f"| source=P"
+                            f"{getattr(detection, 'measurement_source_preset', preset)} "
+                            f"| bearing="
+                            f"{detection.bearing_deg:.3f}° "
+                            f"| distance="
+                            f"{detection.distance_m} "
+                            f"| anchor_age="
+                            f"{getattr(detection, 'fusion_anchor_age_sec', None)} "
+                            f"| anchor_fresh="
+                            f"{getattr(detection, 'fusion_anchor_fresh', None)} "
+                            f"| anchor_stale="
+                            f"{getattr(detection, 'fusion_anchor_stale', False)}"
+                        )
+
+
+                # =============================================
                 # Draw frame
                 # =============================================
 
@@ -1918,45 +2351,296 @@ def main():
 
 
                 # =============================================
-                # EVENT-BASED ALERTING
+                # EVENT-BASED ALERTING + DEFERRED FINALIZATION
                 # =============================================
                 #
-                # ไม่มี Global cooldown
+                # CENTER:
+                #   alert immediately.
                 #
-                # แต่ละ Detection ถูกตรวจว่าเป็น:
+                # EDGE / TRANSITION without fusion:
+                #   hold briefly for a trusted CENTER observation.
                 #
-                # - Event ใหม่
-                # - Duplicate Event
+                # If no trusted observation arrives:
+                #   timeout fallback uses the stored observation.
                 #
-                # ด้วย:
-                #
-                # class
-                # + preset
-                # + bbox IoU
-                #
+
+                alert_candidates = []
+
+
+                # =============================================
+                # Current confirmed detections
                 # =============================================
 
                 if confirmed:
 
+                    for detection in confirmed:
 
-                    # -----------------------------------------
-                    # Confidence สูงก่อน
-                    # -----------------------------------------
+                        zone = str(
+                            getattr(
+                                detection,
+                                "bearing_zone",
+                                "EDGE",
+                            )
+                        ).upper()
+
+
+                        fused = bool(
+                            getattr(
+                                detection,
+                                "measurement_fused",
+                                False,
+                            )
+                        )
+
+
+                        object_id = getattr(
+                            detection,
+                            "object_id",
+                            None,
+                        )
+
+
+                        # -------------------------------------
+                        # Trusted measurement available now
+                        # -------------------------------------
+                        #
+                        # CENTER itself is trusted.
+                        #
+                        # A fused EDGE/TRANSITION already carries
+                        # the trusted anchor measurement.
+                        #
+
+                        if (
+                            zone == "CENTER"
+                            or fused
+                        ):
+
+                            cancelled = (
+                                pending_alerts
+                                .cancel(
+                                    detection,
+                                    preset,
+                                )
+                            )
+
+
+                            if (
+                                cancelled
+                                is not None
+                            ):
+
+                                print(
+                                    "✅ Pending alert finalized "
+                                    f"| id={object_id} "
+                                    f"| zone={zone} "
+                                    f"| source=P"
+                                    f"{getattr(detection, 'measurement_source_preset', preset)}"
+                                )
+
+
+                            alert_candidates.append(
+                                (
+                                    detection,
+                                    preset,
+                                    frame,
+                                    "trusted-measurement",
+                                )
+                            )
+
+
+                        # -------------------------------------
+                        # EDGE / TRANSITION has no trusted
+                        # CENTER anchor yet.
+                        # -------------------------------------
+
+                        else:
+
+                            verification_preset = (
+                                pending_alerts
+                                .verification_target(
+                                    detection,
+                                    preset,
+                                )
+                            )
+
+
+                            if (
+                                verification_preset
+                                is None
+                            ):
+
+                                from alert_finalizer import (
+                                    choose_verification_preset,
+                                )
+
+                                verification_preset = (
+                                    choose_verification_preset(
+                                        detection,
+                                        preset,
+                                    )
+                                )
+
+
+                            forced = (
+                                pending_alerts
+                                .defer(
+                                    detection,
+                                    preset,
+                                    frame,
+                                    now_mono,
+                                    verification_preset=(
+                                        verification_preset
+                                    ),
+                                )
+                            )
+
+
+                            verification_preset = (
+                                pending_alerts
+                                .verification_target(
+                                    detection,
+                                    preset,
+                                )
+                            )
+
+
+                            print(
+                                "⏳ Alert deferred "
+                                f"| id={object_id} "
+                                f"| preset={preset} "
+                                f"| zone={zone} "
+                                f"| verify=P"
+                                f"{verification_preset} "
+                                f"| pending="
+                                f"{pending_alerts.pending_count} "
+                                f"| safety<="
+                                f"{pending_alerts.timeout_sec:.1f}s"
+                            )
+
+
+                            # Bounded-buffer safety fallback.
+                            # Never silently drop an alert.
+                            for item in forced:
+
+                                alert_candidates.append(
+                                    (
+                                        item.detection,
+                                        item.preset,
+                                        item.frame,
+                                        "buffer-pressure-fallback",
+                                    )
+                                )
+
+
+                # =============================================
+                # Preset-aware passive verification
+                # =============================================
+                #
+                # Trusted detections above get the FIRST chance
+                # to cancel pending objects.
+                #
+                # Only after processing current detections do we
+                # mark this usable preset as scanned.
+                #
+                # If this preset was the verification target and
+                # no trusted matching observation cancelled the
+                # pending object, fallback now.
+                # =============================================
+
+                for item in (
+                    pending_alerts
+                    .mark_preset_scanned(
+                        preset,
+                        now_mono,
+                    )
+                ):
+
+                    print(
+                        "🔎 Pending verification complete "
+                        f"| id="
+                        f"{getattr(item.detection, 'object_id', None)} "
+                        f"| source=P"
+                        f"{item.preset} "
+                        f"| verify=P"
+                        f"{item.verification_preset} "
+                        f"| result=no-trusted-match"
+                    )
+
+
+                    alert_candidates.append(
+                        (
+                            item.detection,
+                            item.preset,
+                            item.frame,
+                            "verification-fallback",
+                        )
+                    )
+
+
+                # =============================================
+                # Pending timeout fallback
+                # =============================================
+                #
+                # Run AFTER current detections.
+                #
+                # This is important:
+                # if CENTER arrives exactly at timeout,
+                # CENTER gets a chance to cancel EDGE first.
+                #
+
+                for item in (
+                    pending_alerts
+                    .pop_expired(
+                        now_mono
+                    )
+                ):
+
+                    print(
+                        "⌛ Pending safety timeout "
+                        f"| id="
+                        f"{getattr(item.detection, 'object_id', None)} "
+                        f"| preset="
+                        f"{item.preset}"
+                    )
+
+
+                    alert_candidates.append(
+                        (
+                            item.detection,
+                            item.preset,
+                            item.frame,
+                            "timeout-fallback",
+                        )
+                    )
+
+
+                # =============================================
+                # Finalized alerts only
+                # =============================================
+
+                if alert_candidates:
 
                     ordered_alerts = sorted(
-                        confirmed,
-                        key=lambda d: (
-                            d.confidence
+                        alert_candidates,
+
+                        key=lambda item: (
+                            item[0].confidence
                         ),
+
                         reverse=True,
                     )
 
 
-                    for detection in ordered_alerts:
+                    for (
+                        detection,
+                        alert_preset,
+                        alert_frame,
+                        finalization_reason,
+                    ) in ordered_alerts:
 
 
                         # =====================================
-                        # Check event cooldown
+                        # Event cooldown / deduplication
                         # =====================================
 
                         (
@@ -1966,24 +2650,22 @@ def main():
                             alert_dedup
                             .should_alert(
                                 detection,
-                                preset,
+                                alert_preset,
                                 now_mono,
                             )
                         )
 
-
-                        # =====================================
-                        # Duplicate Event
-                        # =====================================
 
                         if not should_alert:
 
                             print(
                                 "🔕 Alert suppressed "
                                 f"| preset="
-                                f"{preset} "
+                                f"{alert_preset} "
                                 f"| class="
                                 f"{detection.canonical_class} "
+                                f"| finalize="
+                                f"{finalization_reason} "
                                 f"| {reason}"
                             )
 
@@ -1991,15 +2673,17 @@ def main():
 
 
                         # =====================================
-                        # NEW EVENT
+                        # NEW FINALIZED EVENT
                         # =====================================
 
                         print(
                             "🆕 New alert event "
                             f"| preset="
-                            f"{preset} "
+                            f"{alert_preset} "
                             f"| class="
-                            f"{detection.canonical_class}"
+                            f"{detection.canonical_class} "
+                            f"| finalize="
+                            f"{finalization_reason}"
                         )
 
 
@@ -2009,27 +2693,24 @@ def main():
 
                         atomic_imwrite(
                             LATEST_ALERT,
-                            frame,
+                            alert_frame,
                         )
 
 
                         # -------------------------------------
-                        # Build safe message
+                        # Build message from FINAL measurement
                         # -------------------------------------
 
                         message = (
                             format_alert(
                                 detection,
+
                                 bearing_calibrated=(
                                     site_bearing_calibrated
                                 ),
                             )
                         )
 
-
-                        # -------------------------------------
-                        # Alert accepted state
-                        # -------------------------------------
 
                         alert_accepted = True
 
@@ -2040,15 +2721,10 @@ def main():
 
                         if notifier.enabled:
 
-
-                            # ---------------------------------
-                            # Create unique spool image
-                            # ---------------------------------
-
                             spool_path = (
                                 create_alert_spool(
-                                    frame,
-                                    preset,
+                                    alert_frame,
+                                    alert_preset,
                                     detection,
                                 )
                             )
@@ -2062,9 +2738,6 @@ def main():
                                     "created"
                                 )
 
-                                # ไม่ Record Cooldown
-                                # เพื่อให้รอบถัดไป Retry
-
                                 alert_accepted = (
                                     False
                                 )
@@ -2072,17 +2745,14 @@ def main():
 
                             else:
 
-
-                                # -----------------------------
-                                # Queue Telegram
-                                # -----------------------------
-
                                 alert_accepted = (
                                     notifier.submit(
                                         message,
+
                                         str(
                                             spool_path
                                         ),
+
                                         delete_after_send=True,
                                     )
                                 )
@@ -2118,26 +2788,14 @@ def main():
 
 
                         # =====================================
-                        # Record cooldown event
-                        # =====================================
-                        #
-                        # Record เมื่อ:
-                        #
-                        # - Telegram Queue รับแล้ว
-                        # หรือ
-                        # - Telegram Disabled
-                        #   แต่ Local Alert สำเร็จ
-                        #
-                        # ถ้า Queue เต็ม / Spool Fail
-                        # จะไม่ Record เพื่อให้ Retry
-                        #
+                        # Record cooldown only after accepted
                         # =====================================
 
                         if alert_accepted:
 
                             alert_dedup.record_alert(
                                 detection,
-                                preset,
+                                alert_preset,
                                 now_mono,
                             )
 
@@ -2157,12 +2815,17 @@ def main():
 
                         print(
                             f"Preset: "
-                            f"{preset}"
+                            f"{alert_preset}"
                         )
 
                         print(
                             f"Event: "
                             f"{reason}"
+                        )
+
+                        print(
+                            f"Finalization: "
+                            f"{finalization_reason}"
                         )
 
                         print(

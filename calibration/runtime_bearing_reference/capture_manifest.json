@@ -1,0 +1,81 @@
+{
+  "version": 2,
+  "created_at": 1788851662.9018939,
+  "frame_width": 1280,
+  "frame_height": 720,
+  "nominal_hfov_deg": 67.593424,
+  "presets": {
+    "1": {
+      "preset": 1,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_1.jpg",
+      "seq": 216,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851606.00704
+    },
+    "2": {
+      "preset": 2,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_2.jpg",
+      "seq": 336,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851610.8091424
+    },
+    "3": {
+      "preset": 3,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_3.jpg",
+      "seq": 456,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851615.6089585
+    },
+    "4": {
+      "preset": 4,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_4.jpg",
+      "seq": 576,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851620.405756
+    },
+    "5": {
+      "preset": 5,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_5.jpg",
+      "seq": 692,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851625.0484746
+    },
+    "6": {
+      "preset": 6,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_6.jpg",
+      "seq": 1283,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851648.6950102
+    },
+    "7": {
+      "preset": 7,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_7.jpg",
+      "seq": 1402,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851653.4584534
+    },
+    "8": {
+      "preset": 8,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_8.jpg",
+      "seq": 1522,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851658.2603812
+    },
+    "9": {
+      "preset": 9,
+      "path": "/opt/smart-fire-detection-v2/calibration/bearing_v2/images/preset_9.jpg",
+      "seq": 1638,
+      "width": 1280,
+      "height": 720,
+      "captured_at": 1788851662.9018288
+    }
+  }
+}

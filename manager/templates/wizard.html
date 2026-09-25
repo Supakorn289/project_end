@@ -1,0 +1,1679 @@
+<!doctype html>
+<html lang="th">
+
+<head>
+<meta charset="utf-8">
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+<title>Smart Fire Setup Wizard</title>
+
+<style>
+:root{
+ --bg:#090f17;
+ --panel:#111b29;
+ --panel2:#152132;
+ --line:#29394e;
+ --text:#f5f7fb;
+ --muted:#91a2b8;
+ --blue:#589cff;
+ --green:#34d47e;
+ --yellow:#f2ba55;
+ --red:#ef6464;
+}
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:var(--bg);
+ color:var(--text);
+ font-family:system-ui,sans-serif
+}
+.shell{
+ display:grid;
+ grid-template-columns:270px 1fr;
+ min-height:100vh
+}
+aside{
+ border-right:1px solid var(--line);
+ padding:24px 18px
+}
+.brand{
+ font-size:20px;
+ font-weight:800;
+ margin-bottom:8px
+}
+.sub{
+ color:var(--muted);
+ font-size:13px
+}
+.steps{
+ margin-top:30px;
+ display:grid;
+ gap:7px
+}
+.step{
+ border:1px solid transparent;
+ color:var(--muted);
+ padding:11px;
+ border-radius:10px
+}
+.step.active{
+ background:var(--panel2);
+ color:white;
+ border-color:var(--line)
+}
+main{
+ padding:26px;
+ max-width:1250px;
+ width:100%
+}
+.top{
+ display:flex;
+ align-items:flex-start;
+ justify-content:space-between;
+ gap:20px;
+ margin-bottom:20px
+}
+a{color:#8abaff}
+.panel{
+ background:var(--panel);
+ border:1px solid var(--line);
+ border-radius:15px;
+ padding:20px;
+ margin-bottom:16px
+}
+.grid2{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:12px
+}
+.grid3{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:12px
+}
+label{
+ display:grid;
+ gap:6px;
+ color:var(--muted);
+ font-size:13px
+}
+input,select{
+ background:#0b131e;
+ border:1px solid #34475f;
+ border-radius:9px;
+ padding:10px 11px;
+ color:white;
+ width:100%
+}
+button{
+ border:0;
+ border-radius:9px;
+ padding:10px 14px;
+ background:#327fe8;
+ color:white;
+ cursor:pointer
+}
+button.secondary{background:#29384c}
+button.green{background:#188c50}
+button.red{background:#b44040}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{
+ display:flex;
+ gap:8px;
+ flex-wrap:wrap;
+ align-items:center
+}
+.status{
+ background:#0b131e;
+ border:1px solid var(--line);
+ border-radius:10px;
+ padding:12px;
+ margin-top:12px;
+ white-space:pre-wrap
+}
+.good{color:var(--green)}
+.warn{color:var(--yellow)}
+.bad{color:var(--red)}
+.hidden{display:none!important}
+.preset-grid{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:10px
+}
+.preset{
+ background:var(--panel2);
+ border:1px solid var(--line);
+ border-radius:11px;
+ padding:12px
+}
+.preset img{
+ width:100%;
+ aspect-ratio:16/9;
+ object-fit:cover;
+ background:#060a10;
+ margin-top:9px;
+ border-radius:8px
+}
+.canvas-wrap{
+ position:relative;
+ width:100%;
+ background:#030609;
+ border-radius:10px;
+ overflow:hidden
+}
+canvas{
+ display:block;
+ width:100%;
+ cursor:crosshair
+}
+.points{
+ display:grid;
+ gap:7px;
+ margin-top:12px
+}
+.point{
+ display:grid;
+ grid-template-columns:1fr auto;
+ gap:8px;
+ background:var(--panel2);
+ padding:9px;
+ border-radius:8px
+}
+.pair{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:12px
+}
+small{color:var(--muted)}
+@media(max-width:800px){
+ .shell{grid-template-columns:1fr}
+ aside{border-right:0;border-bottom:1px solid var(--line)}
+ .steps{grid-template-columns:repeat(2,1fr)}
+ .grid2,.grid3,.preset-grid,.pair{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+
+<div class="shell">
+
+<aside>
+    <div class="brand">
+        Smart Fire Setup
+    </div>
+    <div class="sub">
+        Guided Calibration
+    </div>
+
+    <div class="steps">
+        <div class="step active">1 · Site</div>
+        <div class="step">2 · Device</div>
+        <div class="step">3 · PTZ Capture</div>
+        <div class="step">4 · Distance</div>
+        <div class="step">5 · Verify Distance</div>
+        <div class="step">6 · Cross-Preset</div>
+        <div class="step">7 · True North</div>
+        <div class="step">8 · Final Verify</div>
+    </div>
+</aside>
+
+
+<main>
+
+<div class="top">
+    <div>
+        <h1>Setup Wizard</h1>
+        <div class="sub">
+            ทุกค่าถูกเก็บตาม Site
+            และยังไม่ทับ Runtime จนกว่าจะ Activate
+        </div>
+    </div>
+
+    <div class="row">
+        <a href="/">เริ่มใหม่</a>
+        <a href="/overview">Control Center</a>
+    </div>
+</div>
+
+
+<section
+    id="unlock"
+    class="panel hidden"
+>
+    <h2>Unlock Setup</h2>
+    <p class="sub">
+        การ Capture / Calibration / Save
+        ต้องยืนยัน Manager Token
+    </p>
+
+    <div class="row">
+        <input
+            id="token"
+            type="password"
+            placeholder="Manager Token"
+        >
+        <button id="btnUnlock">
+            Unlock
+        </button>
+    </div>
+
+    <div
+        id="authStatus"
+        class="status"
+    >
+        Locked
+    </div>
+</section>
+
+
+<section
+    id="sitePanel"
+    class="panel"
+>
+    <h2>1. เลือกพื้นที่</h2>
+
+    <div
+        id="existingBox"
+        class="hidden"
+    >
+        <label>
+            Existing Site
+            <select id="existingSite"></select>
+        </label>
+
+        <div class="row" style="margin-top:12px">
+            <button id="btnUseExisting">
+                ใช้พื้นที่นี้
+            </button>
+        </div>
+    </div>
+
+
+    <div
+        id="newBox"
+        class="hidden"
+    >
+        <div class="grid2">
+
+            <label>
+                Site ID
+                <input
+                    id="newSiteId"
+                    placeholder="site-building-a"
+                >
+            </label>
+
+            <label>
+                ชื่อพื้นที่
+                <input
+                    id="newSiteName"
+                    placeholder="Building A"
+                >
+            </label>
+
+            <label>
+                รูปแบบ
+                <select id="newSiteMode">
+                    <option value="LAB">
+                        LAB — พื้นที่ทดลอง
+                    </option>
+                    <option value="PRODUCTION">
+                        PRODUCTION — ติดตั้งจริง
+                    </option>
+                </select>
+            </label>
+
+        </div>
+
+        <div class="row" style="margin-top:12px">
+            <button id="btnCreateSite">
+                สร้าง Site
+            </button>
+        </div>
+    </div>
+
+    <div
+        id="siteStatus"
+        class="status"
+    >
+        เลือก Site ก่อน
+    </div>
+</section>
+
+
+<section
+    id="devicePanel"
+    class="panel hidden"
+>
+    <h2>2. Device & Calibration Mode</h2>
+
+    <p class="sub">
+        หาก IP/Protocol ไม่ถูกต้อง
+        ให้แก้ที่ Device Settings ก่อน
+    </p>
+
+    <div class="row">
+        <a href="/settings">
+            เปิด Device Settings
+        </a>
+
+        <button
+            id="btnStartCalibration"
+            class="green"
+        >
+            เริ่ม Calibration Mode
+        </button>
+
+        <button
+            id="btnFinishCalibration"
+            class="secondary"
+        >
+            จบ Calibration / Resume Detection
+        </button>
+    </div>
+
+    <div
+        id="calibrationStatus"
+        class="status"
+    >
+        —
+    </div>
+</section>
+
+
+<section
+    id="capturePanel"
+    class="panel hidden"
+>
+    <h2>3. Capture PTZ Preset P1–P9</h2>
+
+    <p class="sub">
+        ระบบจะ Move PTZ → รอ Fresh Frame →
+        ตรวจ Stable Frame → บันทึกภาพ
+        โดยไม่โหลด AI
+    </p>
+
+    <div class="row">
+        <select id="captureSet">
+            <option value="main">
+                Main / Training
+            </option>
+            <option value="holdout">
+                Verification / Holdout
+            </option>
+        </select>
+
+        <button id="btnCaptureAll">
+            Capture P1–P9
+        </button>
+    </div>
+
+    <div
+        id="presetGrid"
+        class="preset-grid"
+        style="margin-top:14px"
+    ></div>
+
+    <div
+        id="captureStatus"
+        class="status"
+    >
+        ยังไม่ได้ Capture
+    </div>
+</section>
+
+
+<section
+    id="distancePanel"
+    class="panel hidden"
+>
+    <h2>4. Distance Calibration</h2>
+
+    <p class="sub">
+        เลือกภาพ Preset แล้วคลิก
+        <b>จุดล่างสุดของวัตถุที่สัมผัสพื้น</b>
+        จากนั้นกรอกระยะจริง
+    </p>
+
+    <div class="grid2">
+        <label>
+            Preset
+            <select id="distancePreset"></select>
+        </label>
+
+        <label>
+            ระยะจริง (เมตร)
+            <input
+                id="distanceMeters"
+                type="number"
+                step="0.01"
+                min="0.1"
+            >
+        </label>
+    </div>
+
+    <div
+        class="canvas-wrap"
+        style="margin-top:14px"
+    >
+        <canvas id="distanceCanvas"></canvas>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+        <span>
+            Y =
+            <b id="distanceY">—</b>
+            px
+        </span>
+
+        <button id="btnAddDistance">
+            เพิ่ม Calibration Point
+        </button>
+
+        <button
+            id="btnFitDistance"
+            class="green"
+        >
+            Fit Distance Model
+        </button>
+    </div>
+
+    <div
+        id="distancePoints"
+        class="points"
+    ></div>
+
+    <div
+        id="distanceStatus"
+        class="status"
+    >
+        แนะนำ 5–8 จุด กระจายทั่วช่วงใช้งานจริง
+    </div>
+</section>
+
+
+<section
+    id="verifyPanel"
+    class="panel hidden"
+>
+    <h2>5. Distance Verification</h2>
+
+    <p class="sub">
+        ใช้ระยะใหม่ที่ไม่ได้ใช้ตอน Fit
+    </p>
+
+    <div class="grid2">
+
+        <label>
+            ระยะจริงของจุด Verify
+            <input
+                id="verifyMeters"
+                type="number"
+                step="0.01"
+                min="0.1"
+            >
+        </label>
+
+        <label>
+            Y pixel
+            <input
+                id="verifyY"
+                type="number"
+                step="0.1"
+            >
+        </label>
+
+    </div>
+
+    <div class="row" style="margin-top:12px">
+        <button id="btnVerifyDistance">
+            Verify
+        </button>
+    </div>
+
+    <div
+        id="verifyStatus"
+        class="status"
+    >
+        —
+    </div>
+</section>
+
+
+<section
+    id="geometryPanel"
+    class="panel hidden"
+>
+    <h2>6. Cross-Preset Landmark</h2>
+
+    <p class="sub">
+        คลิกวัตถุ/จุดจริงเดียวกันในภาพ A และ B
+        ใช้วัตถุไกล คงที่ และมองเห็นชัด
+    </p>
+
+    <div class="grid3">
+
+        <label>
+            Pair
+            <select id="geometryPair">
+                <option>1-2</option>
+                <option>2-3</option>
+                <option>3-4</option>
+                <option>4-5</option>
+                <option>1-6</option>
+                <option>6-7</option>
+                <option>7-8</option>
+                <option>8-9</option>
+                <option>5-9</option>
+            </select>
+        </label>
+
+        <label>
+            Dataset
+            <select id="geometryPhase">
+                <option value="train">
+                    Training
+                </option>
+                <option value="holdout">
+                    Holdout / Verification
+                </option>
+            </select>
+        </label>
+
+        <div class="row">
+            <button id="btnSaveMark">
+                บันทึก Landmark
+            </button>
+            <button
+                id="btnClearMarks"
+                class="red"
+            >
+                ล้าง Pair นี้
+            </button>
+        </div>
+
+    </div>
+
+    <div
+        class="pair"
+        style="margin-top:14px"
+    >
+        <div>
+            <div id="pairLabelA">P1</div>
+            <canvas id="geometryA"></canvas>
+        </div>
+
+        <div>
+            <div id="pairLabelB">P2</div>
+            <canvas id="geometryB"></canvas>
+        </div>
+    </div>
+
+    <div
+        id="geometryStatus"
+        class="status"
+    >
+        Mark อย่างน้อยหลายจุดต่อ Pair
+        และทำ Holdout แยกจาก Training
+    </div>
+</section>
+
+
+<section
+    id="finalPanel"
+    class="panel hidden"
+>
+    <h2>7–8. True North / Final Verification</h2>
+
+    <p class="sub">
+        ขั้นนี้จะเปิดเต็มรูปแบบใน Batch 3B
+        หลังเราตรวจ schema ของ
+        ACTIVE_ROTATION_3D จากเครื่องจริง
+    </p>
+
+    <div class="row">
+        <button id="btnInspectSchema">
+            Inspect Runtime Geometry Schema
+        </button>
+    </div>
+
+    <div
+        id="schemaStatus"
+        class="status"
+    >
+        —
+    </div>
+</section>
+
+</main>
+</div>
+
+
+<script>
+let csrf = null;
+let siteId = null;
+let wizardState = null;
+
+let distanceClick = null;
+let geometryClickA = null;
+let geometryClickB = null;
+
+const qs =
+    new URLSearchParams(
+        location.search
+    );
+
+const entryMode =
+    qs.get("mode")
+    || "existing";
+
+
+async function api(
+    url,
+    options={},
+){
+    options.headers = {
+        ...(options.headers || {}),
+        "Content-Type":
+            "application/json",
+    };
+
+    if(csrf){
+        options.headers[
+            "X-CSRF-Token"
+        ] = csrf;
+    }
+
+    const response =
+        await fetch(
+            url,
+            options
+        );
+
+    const data =
+        await response.json();
+
+    if(!response.ok){
+        if(response.status === 401){
+            document
+                .getElementById("unlock")
+                .classList.remove("hidden");
+        }
+
+        throw new Error(
+            data.error
+            || JSON.stringify(data)
+        );
+    }
+
+    return data;
+}
+
+
+async function authState(){
+    const data =
+        await api(
+            "/api/auth/session"
+        );
+
+    if(data.authenticated){
+        csrf = data.csrf;
+    }else{
+        document
+            .getElementById("unlock")
+            .classList.remove("hidden");
+    }
+}
+
+
+document
+    .getElementById("btnUnlock")
+    .onclick =
+async()=>{
+    try{
+        const data =
+            await api(
+                "/api/auth/login",
+                {
+                    method:"POST",
+                    body:JSON.stringify({
+                        token:
+                            document
+                            .getElementById("token")
+                            .value
+                            .trim()
+                    })
+                }
+            );
+
+        csrf = data.csrf;
+
+        document
+            .getElementById("unlock")
+            .classList.add("hidden");
+
+        document
+            .getElementById("authStatus")
+            .textContent =
+            "Unlocked";
+
+    }catch(error){
+        document
+            .getElementById("authStatus")
+            .textContent =
+            String(error);
+    }
+};
+
+
+function showAfterSite(){
+    [
+        "devicePanel",
+        "capturePanel",
+        "distancePanel",
+        "verifyPanel",
+        "geometryPanel",
+        "finalPanel",
+    ].forEach(
+        id =>
+            document
+            .getElementById(id)
+            .classList
+            .remove("hidden")
+    );
+
+    buildPresetGrid();
+}
+
+
+async function loadSites(){
+
+    const data =
+        await api(
+            "/api/wizard/sites"
+        );
+
+    const sites =
+        data.sites
+        || {};
+
+    const select =
+        document
+        .getElementById(
+            "existingSite"
+        );
+
+    select.innerHTML = "";
+
+    for(
+        const [id,site]
+        of Object.entries(sites)
+    ){
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value = id;
+
+        option.textContent =
+            `${site.display_name || id} · ${site.mode} · ${site.lifecycle}`;
+
+        select.appendChild(
+            option
+        );
+    }
+}
+
+
+if(entryMode === "new"){
+    document
+        .getElementById("newBox")
+        .classList.remove("hidden");
+}else{
+    document
+        .getElementById("existingBox")
+        .classList.remove("hidden");
+
+    loadSites().catch(
+        console.error
+    );
+}
+
+
+document
+    .getElementById("btnUseExisting")
+    .onclick =
+async()=>{
+    siteId =
+        document
+        .getElementById("existingSite")
+        .value;
+
+    const data =
+        await api(
+            `/api/wizard/state/${siteId}`
+        );
+
+    wizardState =
+        data.state;
+
+    document
+        .getElementById("siteStatus")
+        .textContent =
+        `Using ${siteId} · ${wizardState.mode}`;
+
+    showAfterSite();
+    restoreCaptures();
+};
+
+
+document
+    .getElementById("btnCreateSite")
+    .onclick =
+async()=>{
+    try{
+        const data =
+            await api(
+                "/api/wizard/site/new",
+                {
+                    method:"POST",
+                    body:JSON.stringify({
+                        site_id:
+                            document
+                            .getElementById("newSiteId")
+                            .value
+                            .trim(),
+
+                        display_name:
+                            document
+                            .getElementById("newSiteName")
+                            .value
+                            .trim(),
+
+                        mode:
+                            document
+                            .getElementById("newSiteMode")
+                            .value
+                    })
+                }
+            );
+
+        siteId =
+            data.site.site_id;
+
+        wizardState =
+            data.state;
+
+        document
+            .getElementById("siteStatus")
+            .textContent =
+            `Created ${siteId} · ${wizardState.mode}`;
+
+        showAfterSite();
+
+    }catch(error){
+        document
+            .getElementById("siteStatus")
+            .textContent =
+            String(error);
+    }
+};
+
+
+document
+    .getElementById("btnStartCalibration")
+    .onclick =
+async()=>{
+    if(!siteId)return;
+
+    const data =
+        await api(
+            `/api/wizard/${siteId}/calibration/start`,
+            {
+                method:"POST",
+                body:"{}"
+            }
+        );
+
+    wizardState =
+        data.state;
+
+    document
+        .getElementById("calibrationStatus")
+        .textContent =
+        "CALIBRATION MODE ACTIVE\n"
+        + "Detection paused\n"
+        + "Camera/PTZ reserved for setup";
+};
+
+
+document
+    .getElementById("btnFinishCalibration")
+    .onclick =
+async()=>{
+    if(!siteId)return;
+
+    const data =
+        await api(
+            `/api/wizard/${siteId}/calibration/finish`,
+            {
+                method:"POST",
+                body:"{}"
+            }
+        );
+
+    document
+        .getElementById("calibrationStatus")
+        .textContent =
+        JSON.stringify(
+            data,
+            null,
+            2
+        );
+};
+
+
+function buildPresetGrid(){
+
+    const root =
+        document
+        .getElementById("presetGrid");
+
+    root.innerHTML = "";
+
+    const distanceSelect =
+        document
+        .getElementById(
+            "distancePreset"
+        );
+
+    distanceSelect.innerHTML = "";
+
+    for(let p=1;p<=9;p++){
+
+        root.insertAdjacentHTML(
+            "beforeend",
+            `
+            <div class="preset">
+                <b>P${p}</b>
+                <button
+                    data-capture="${p}"
+                    style="float:right"
+                >
+                    Capture
+                </button>
+                <img
+                    id="imgP${p}"
+                    alt="P${p}"
+                >
+            </div>
+            `
+        );
+
+        distanceSelect
+            .insertAdjacentHTML(
+                "beforeend",
+                `<option value="${p}">
+                    P${p}
+                </option>`
+            );
+    }
+
+    root
+        .querySelectorAll(
+            "[data-capture]"
+        )
+        .forEach(
+            button=>{
+                button.onclick =
+                    ()=>captureOne(
+                        Number(
+                            button.dataset.capture
+                        )
+                    );
+            }
+        );
+}
+
+
+async function captureOne(preset){
+
+    if(!siteId)return;
+
+    const captureSet =
+        document
+        .getElementById("captureSet")
+        .value;
+
+    document
+        .getElementById("captureStatus")
+        .textContent =
+        `Capturing P${preset}...`;
+
+    const data =
+        await api(
+            `/api/wizard/${siteId}/capture`,
+            {
+                method:"POST",
+                body:JSON.stringify({
+                    preset,
+                    capture_set:
+                        captureSet
+                })
+            }
+        );
+
+    if(captureSet === "main"){
+        document
+            .getElementById(
+                `imgP${preset}`
+            )
+            .src =
+            data.relative_url
+            + `?t=${Date.now()}`;
+    }
+
+    document
+        .getElementById("captureStatus")
+        .textContent =
+        `P${preset} captured · seq=${data.seq}`;
+
+    const state =
+        await api(
+            `/api/wizard/state/${siteId}`
+        );
+
+    wizardState =
+        state.state;
+
+    loadDistanceImage();
+    loadGeometryPair();
+}
+
+
+document
+    .getElementById("btnCaptureAll")
+    .onclick =
+async()=>{
+    for(let p=1;p<=9;p++){
+        await captureOne(p);
+    }
+};
+
+
+function restoreCaptures(){
+
+    if(!wizardState)return;
+
+    const captures =
+        wizardState.captures.main
+        || {};
+
+    for(
+        const [preset,data]
+        of Object.entries(captures)
+    ){
+        const img =
+            document.getElementById(
+                `imgP${preset}`
+            );
+
+        if(img){
+            img.src =
+                data.relative_url
+                + `?t=${Date.now()}`;
+        }
+    }
+
+    loadDistanceImage();
+    loadGeometryPair();
+}
+
+
+function drawImageOnCanvas(
+    canvas,
+    url,
+    point=null,
+){
+
+    if(!url)return;
+
+    const image =
+        new Image();
+
+    image.onload = ()=>{
+
+        canvas.width =
+            image.naturalWidth;
+
+        canvas.height =
+            image.naturalHeight;
+
+        const ctx =
+            canvas.getContext("2d");
+
+        ctx.drawImage(
+            image,
+            0,
+            0
+        );
+
+        if(point){
+            ctx.beginPath();
+            ctx.arc(
+                point.x,
+                point.y,
+                8,
+                0,
+                Math.PI*2
+            );
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#ff3b3b";
+            ctx.stroke();
+        }
+    };
+
+    image.src =
+        url
+        + `?t=${Date.now()}`;
+}
+
+
+function canvasPoint(
+    canvas,
+    event,
+){
+
+    const rect =
+        canvas.getBoundingClientRect();
+
+    return {
+        x:
+            (
+                event.clientX
+                - rect.left
+            )
+            * canvas.width
+            / rect.width,
+
+        y:
+            (
+                event.clientY
+                - rect.top
+            )
+            * canvas.height
+            / rect.height,
+    };
+}
+
+
+function loadDistanceImage(){
+
+    if(!wizardState)return;
+
+    const preset =
+        document
+        .getElementById("distancePreset")
+        .value;
+
+    const capture =
+        wizardState
+        .captures
+        .main[
+            preset
+        ];
+
+    if(!capture)return;
+
+    drawImageOnCanvas(
+        document
+        .getElementById("distanceCanvas"),
+        capture.relative_url,
+        distanceClick
+    );
+}
+
+
+document
+    .getElementById("distancePreset")
+    .onchange =
+    loadDistanceImage;
+
+
+document
+    .getElementById("distanceCanvas")
+    .onclick =
+event=>{
+    const canvas =
+        event.currentTarget;
+
+    distanceClick =
+        canvasPoint(
+            canvas,
+            event
+        );
+
+    document
+        .getElementById("distanceY")
+        .textContent =
+        distanceClick.y.toFixed(1);
+
+    loadDistanceImage();
+};
+
+
+let distancePoints = [];
+
+
+document
+    .getElementById("btnAddDistance")
+    .onclick =
+()=>{
+    if(!distanceClick)return;
+
+    const distance =
+        Number(
+            document
+            .getElementById("distanceMeters")
+            .value
+        );
+
+    if(!(distance > 0))return;
+
+    distancePoints.push({
+        distance_m:
+            distance,
+        y_px:
+            distanceClick.y
+    });
+
+    renderDistancePoints();
+};
+
+
+function renderDistancePoints(){
+
+    const root =
+        document
+        .getElementById("distancePoints");
+
+    root.innerHTML =
+        distancePoints.map(
+            (point,index)=>`
+            <div class="point">
+                <span>
+                    #${index+1}
+                    · ${point.distance_m.toFixed(2)} m
+                    · Y=${point.y_px.toFixed(1)} px
+                </span>
+                <button
+                    class="red"
+                    onclick="removeDistance(${index})"
+                >
+                    ลบ
+                </button>
+            </div>
+            `
+        ).join("");
+}
+
+
+window.removeDistance =
+index=>{
+    distancePoints.splice(
+        index,
+        1
+    );
+
+    renderDistancePoints();
+};
+
+
+document
+    .getElementById("btnFitDistance")
+    .onclick =
+async()=>{
+    if(!siteId)return;
+
+    const data =
+        await api(
+            `/api/wizard/${siteId}/distance/fit`,
+            {
+                method:"POST",
+                body:JSON.stringify({
+                    points:
+                        distancePoints
+                })
+            }
+        );
+
+    const c =
+        data.candidate;
+
+    document
+        .getElementById("distanceStatus")
+        .textContent =
+        `DISTANCE CANDIDATE\n`
+        + `H = ${c.H.toFixed(4)}\n`
+        + `K = ${c.K.toFixed(4)}\n`
+        + `Pixel RMSE = ${c.pixel_rmse.toFixed(3)} px\n`
+        + `Range = ${c.min_distance_m.toFixed(2)}`
+        + `–${c.max_distance_m.toFixed(2)} m\n`
+        + `Points = ${c.points}`;
+};
+
+
+document
+    .getElementById("btnVerifyDistance")
+    .onclick =
+async()=>{
+    if(!siteId)return;
+
+    const y =
+        Number(
+            document
+            .getElementById("verifyY")
+            .value
+        );
+
+    const actual =
+        Number(
+            document
+            .getElementById("verifyMeters")
+            .value
+        );
+
+    const data =
+        await api(
+            `/api/wizard/${siteId}/distance/verify`,
+            {
+                method:"POST",
+                body:JSON.stringify({
+                    y_px:y,
+                    actual_distance_m:
+                        actual
+                })
+            }
+        );
+
+    const v =
+        data.verification;
+
+    document
+        .getElementById("verifyStatus")
+        .textContent =
+        `Predicted = ${v.predicted_distance_m.toFixed(3)} m\n`
+        + `Actual = ${v.actual_distance_m.toFixed(3)} m\n`
+        + `Error = ${v.signed_error_m.toFixed(3)} m\n`
+        + `Absolute = ${v.absolute_error_m.toFixed(3)} m\n`
+        + `Percent = ${v.percent_error.toFixed(2)}%\n`
+        + `Grade = ${v.grade}`;
+};
+
+
+function geometryPairParts(){
+
+    return document
+        .getElementById("geometryPair")
+        .value
+        .split("-")
+        .map(Number);
+}
+
+
+function loadGeometryPair(){
+
+    if(!wizardState)return;
+
+    const [a,b] =
+        geometryPairParts();
+
+    const phase =
+        document
+        .getElementById("geometryPhase")
+        .value;
+
+    const captures =
+        wizardState
+        .captures[
+            phase === "train"
+            ? "main"
+            : "holdout"
+        ]
+        || {};
+
+    document
+        .getElementById("pairLabelA")
+        .textContent =
+        `P${a}`;
+
+    document
+        .getElementById("pairLabelB")
+        .textContent =
+        `P${b}`;
+
+    geometryClickA = null;
+    geometryClickB = null;
+
+    if(captures[String(a)]){
+        drawImageOnCanvas(
+            document
+            .getElementById("geometryA"),
+            captures[String(a)].relative_url
+        );
+    }
+
+    if(captures[String(b)]){
+        drawImageOnCanvas(
+            document
+            .getElementById("geometryB"),
+            captures[String(b)].relative_url
+        );
+    }
+}
+
+
+document
+    .getElementById("geometryPair")
+    .onchange =
+    loadGeometryPair;
+
+document
+    .getElementById("geometryPhase")
+    .onchange =
+    loadGeometryPair;
+
+
+document
+    .getElementById("geometryA")
+    .onclick =
+event=>{
+    geometryClickA =
+        canvasPoint(
+            event.currentTarget,
+            event
+        );
+
+    const phase =
+        document
+        .getElementById("geometryPhase")
+        .value;
+
+    const [a] =
+        geometryPairParts();
+
+    const captures =
+        wizardState.captures[
+            phase === "train"
+            ? "main"
+            : "holdout"
+        ];
+
+    if(captures[String(a)]){
+        drawImageOnCanvas(
+            event.currentTarget,
+            captures[String(a)].relative_url,
+            geometryClickA
+        );
+    }
+};
+
+
+document
+    .getElementById("geometryB")
+    .onclick =
+event=>{
+    geometryClickB =
+        canvasPoint(
+            event.currentTarget,
+            event
+        );
+
+    const phase =
+        document
+        .getElementById("geometryPhase")
+        .value;
+
+    const [,b] =
+        geometryPairParts();
+
+    const captures =
+        wizardState.captures[
+            phase === "train"
+            ? "main"
+            : "holdout"
+        ];
+
+    if(captures[String(b)]){
+        drawImageOnCanvas(
+            event.currentTarget,
+            captures[String(b)].relative_url,
+            geometryClickB
+        );
+    }
+};
+
+
+document
+    .getElementById("btnSaveMark")
+    .onclick =
+async()=>{
+    if(
+        !siteId
+        || !geometryClickA
+        || !geometryClickB
+    ){
+        return;
+    }
+
+    const data =
+        await api(
+            `/api/wizard/${siteId}/geometry/mark`,
+            {
+                method:"POST",
+                body:JSON.stringify({
+                    pair:
+                        document
+                        .getElementById("geometryPair")
+                        .value,
+
+                    phase:
+                        document
+                        .getElementById("geometryPhase")
+                        .value,
+
+                    x_a_px:
+                        geometryClickA.x,
+
+                    y_a_px:
+                        geometryClickA.y,
+
+                    x_b_px:
+                        geometryClickB.x,
+
+                    y_b_px:
+                        geometryClickB.y,
+                })
+            }
+        );
+
+    document
+        .getElementById("geometryStatus")
+        .textContent =
+        `Saved · Pair count = ${data.count}`;
+
+    const state =
+        await api(
+            `/api/wizard/state/${siteId}`
+        );
+
+    wizardState =
+        state.state;
+
+    loadGeometryPair();
+};
+
+
+document
+    .getElementById("btnClearMarks")
+    .onclick =
+async()=>{
+    if(!siteId)return;
+
+    await api(
+        `/api/wizard/${siteId}/geometry/clear`,
+        {
+            method:"POST",
+            body:JSON.stringify({
+                pair:
+                    document
+                    .getElementById("geometryPair")
+                    .value,
+
+                phase:
+                    document
+                    .getElementById("geometryPhase")
+                    .value,
+            })
+        }
+    );
+
+    document
+        .getElementById("geometryStatus")
+        .textContent =
+        "Pair cleared";
+};
+
+
+document
+    .getElementById("btnInspectSchema")
+    .onclick =
+async()=>{
+    const data =
+        await api(
+            "/api/wizard/geometry/runtime-schema"
+        );
+
+    document
+        .getElementById("schemaStatus")
+        .textContent =
+        JSON.stringify(
+            data.schema,
+            null,
+            2
+        );
+};
+
+
+authState().catch(
+    console.error
+);
+</script>
+
+</body>
+</html>

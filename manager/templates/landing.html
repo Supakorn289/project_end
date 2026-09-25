@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+<title>Smart Fire Setup</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0;
+    min-height:100vh;
+    display:grid;
+    place-items:center;
+    background:#090f17;
+    color:#f6f8fb;
+    font-family:system-ui,sans-serif
+}
+main{
+    width:min(1050px,calc(100% - 32px));
+}
+.kicker{
+    color:#72a9ff;
+    font-weight:700;
+    margin-bottom:8px
+}
+h1{
+    margin:0 0 10px;
+    font-size:clamp(30px,4vw,52px)
+}
+.lead{
+    color:#94a3b8;
+    max-width:700px;
+    margin-bottom:32px
+}
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px
+}
+.card{
+    display:block;
+    text-decoration:none;
+    color:inherit;
+    background:#111b29;
+    border:1px solid #27364a;
+    border-radius:18px;
+    padding:28px;
+    min-height:240px;
+    transition:.15s
+}
+.card:hover{
+    border-color:#579bff;
+    transform:translateY(-2px)
+}
+.icon{
+    font-size:34px;
+    margin-bottom:25px
+}
+h2{margin:0 0 9px}
+p{color:#93a4ba;line-height:1.65}
+.tag{
+    display:inline-block;
+    margin-top:18px;
+    border:1px solid #33445a;
+    border-radius:99px;
+    padding:7px 11px;
+    color:#9abaff
+}
+.footer{
+    margin-top:24px;
+    display:flex;
+    gap:20px
+}
+.footer a{
+    color:#89b9ff
+}
+@media(max-width:700px){
+    .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+<main>
+
+<div class="kicker">
+    SMART FIRE CONTROL CENTER
+</div>
+
+<h1>
+    ตั้งค่าระบบตรวจจับไฟ
+</h1>
+
+<div class="lead">
+    เลือกว่าจะใช้ Calibration ของพื้นที่เดิม
+    หรือเริ่มตั้งค่าพื้นที่ใหม่แบบ Wizard
+    ตั้งแต่ Camera, PTZ, Distance,
+    Cross-Preset Geometry จนถึง Verification
+</div>
+
+<div class="grid">
+
+<a
+    class="card"
+    href="/commissioning?installation=EXISTING"
+>
+    <div class="icon">↩</div>
+    <h2>ใช้พื้นที่เดิม</h2>
+    <p>
+        เลือก Site ที่เคย Calibration แล้ว
+        ตรวจสถานะ ใช้งานต่อ
+        หรือตรวจ/Calibrate ใหม่เฉพาะส่วน
+    </p>
+    <span class="tag">
+        Existing Site
+    </span>
+</a>
+
+<a
+    class="card"
+    href="/commissioning?installation=NEWhref="/setup-wizard?mode=new"mode=LAB"
+>
+    <div class="icon">＋</div>
+    <h2>ตั้งค่าพื้นที่ใหม่</h2>
+    <p>
+        สร้าง Site ใหม่ เลือก LAB หรือ PRODUCTION
+        แล้วระบบจะพา Calibration ทีละขั้น
+    </p>
+    <span class="tag">
+        New Installation
+    </span>
+</a>
+
+</div>
+
+<div class="footer">
+    <a href="/overview">
+        Control Center
+    </a>
+    <a href="/settings">
+        Device Settings
+    </a>
+</div>
+
+</main>
+</body>
+</html>

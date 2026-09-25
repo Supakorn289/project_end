@@ -86,9 +86,11 @@ from config import (
 )
 
 from geometry import (
-    pixel_to_bearing,
+    calibrated_pixel_to_bearing,
     gps_from_bearing_distance,
 )
+
+from preset_geometry import runtime_pixel_to_bearing
 
 
 # ============================================================
@@ -945,6 +947,10 @@ class FireDetector:
         self,
         frame,
         preset: int,
+        *,
+        optical_center_bearing_deg: float | None = None,
+        apply_north_offset: bool = True,
+        allow_gps: bool = True,
     ):
         """
         Run Final R3-E6 inference
@@ -1181,7 +1187,20 @@ class FireDetector:
 
 
                 # --------------------------------------------
-                # Bearing
+                # Bearing — FINAL dynamic rotation runtime
+                # --------------------------------------------
+                #
+                # bbox center (x,y)
+                #     ->
+                # calibrated lens ray
+                #     ->
+                # ACTIVE Q[preset]
+                #     ->
+                # relative/world bearing
+                #
+                # No reference image.
+                # No ORB.
+                # No optical-center image localizer.
                 # --------------------------------------------
 
                 center_x = (
@@ -1189,20 +1208,34 @@ class FireDetector:
                     + x2
                 ) / 2.0
 
+                center_y = (
+                    y1
+                    + y2
+                ) / 2.0
+
+
+                runtime_north_offset_deg = (
+                    self.north_offset_deg
+                    if apply_north_offset
+                    else 0.0
+                )
+
 
                 bearing = (
-                    pixel_to_bearing(
-                        PRESET_BEARING_DEG[
-                            preset
-                        ],
+                    runtime_pixel_to_bearing(
+                        preset,
 
                         center_x,
 
+                        center_y,
+
                         FRAME_WIDTH,
 
-                        HFOV_DEG,
+                        FRAME_HEIGHT,
 
-                        self.north_offset_deg,
+                        north_offset_deg=(
+                            runtime_north_offset_deg
+                        ),
                     )
                 )
 
@@ -1306,6 +1339,8 @@ class FireDetector:
                             # -------------------------------------
 
                             if (
+                                allow_gps
+                                and
                                 site_coordinates_available()
                             ):
 

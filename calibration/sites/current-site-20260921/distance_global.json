@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "H": 216.8599855347836,
+  "K": 1050.9932846657782,
+  "pixel_rmse": 3.682360088847695,
+  "frame_width": 1280,
+  "frame_height": 720,
+  "hfov_deg": 67.593424,
+  "points": 5,
+  "preset": null,
+  "min_distance_m": 2.11,
+  "max_distance_m": 5.17
+}

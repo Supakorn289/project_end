@@ -1,0 +1,36 @@
+Smart Fire Detection v2 - Detection Test Summary
+Preset: 9
+Center Bearing: 182.5 deg
+
+Post-Stable AI Warm-up
+Warm-up is excluded from measured test frames and consensus.
+  Warm-up 1: 1412.1 ms
+  Warm-up 2: 331.8 ms
+  First: 1412.1 ms
+  Last: 331.8 ms
+  Median: 872.0 ms
+
+Measured AI Inference
+Warm-up samples are excluded.
+  Samples: 3
+  Mean: 375.9 ms
+  Median: 394.4 ms
+  Min: 335.1 ms
+  Max: 398.0 ms
+
+Frame 1: seq=174 inference=335.1 ms detections=2
+  - class=fire model_class='fire' conf=0.621 bbox=(871, 672, 941, 718) bearing=197.379° distance=2.097 m quality=extrapolated gps=None
+  - class=fire model_class='fire' conf=0.619 bbox=(897, 597, 939, 643) bearing=197.868° distance=2.466 m quality=calibrated gps=18.79283879, 98.98376882
+
+Frame 2: seq=186 inference=394.4 ms detections=2
+  - class=fire model_class='fire' conf=0.638 bbox=(896, 596, 940, 643) bearing=197.867° distance=2.466 m quality=calibrated gps=18.79283879, 98.98376882
+  - class=fire model_class='fire' conf=0.631 bbox=(871, 672, 941, 718) bearing=197.379° distance=2.097 m quality=extrapolated gps=None
+
+Frame 3: seq=199 inference=398.0 ms detections=2
+  - class=fire model_class='fire' conf=0.644 bbox=(896, 596, 940, 643) bearing=197.867° distance=2.466 m quality=calibrated gps=18.79283879, 98.98376882
+  - class=fire model_class='fire' conf=0.616 bbox=(871, 672, 941, 717) bearing=197.377° distance=2.101 m quality=extrapolated gps=None
+
+Consensus result
+  - confirmed detections: 2
+    * class=fire conf=0.644 bbox=(896, 596, 940, 643) bearing=197.867° distance=2.466 m quality=calibrated gps=18.79283879, 98.98376882
+    * class=fire conf=0.631 bbox=(871, 672, 941, 718) bearing=197.379° distance=2.097 m quality=extrapolated gps=None
