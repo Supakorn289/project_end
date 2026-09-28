@@ -1,0 +1,39 @@
+name: Repository CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-hygiene:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Shell syntax
+        run: bash -n deploy/install-manager-stack.sh
+
+      - name: Python compile
+        run: |
+          python -m py_compile \
+            main.py \
+            config.py \
+            camera.py \
+            detection.py \
+            calibration.py \
+            geometry.py \
+            ptz.py
+          python -m compileall -q manager
+
+      - name: Public repository audit
+        run: bash scripts/repository_audit.sh

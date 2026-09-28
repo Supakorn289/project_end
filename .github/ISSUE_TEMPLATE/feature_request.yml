@@ -1,0 +1,22 @@
+name: Feature request
+description: Propose a change or improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Hardware/runtime impact
+      description: Note whether this changes PTZ movement, calibration, privileged actions, or active runtime.

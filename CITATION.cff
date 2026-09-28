@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software in research, please cite it using this metadata."
+title: "Smart Fire Detection v2"
+type: software
+authors:
+  - family-names: "Prammano"
+    given-names: "Supakorn"
+repository-code: "https://github.com/<GITHUB_USERNAME>/smart-fire-detection-v2"
+version: "1.0.0"
+date-released: "2026-09-28"
+keywords:
+  - fire detection
+  - smoke detection
+  - computer vision
+  - PTZ camera
+  - edge AI
+  - calibration
+  - geolocation
+  - surveillance
+abstract: >
+  Smart Fire Detection v2 is a PTZ-camera-based research and engineering
+  system for AI fire/smoke detection, calibrated bearing and distance
+  estimation, cross-preset fusion, commissioning, revision control, and
+  controlled deployment.
