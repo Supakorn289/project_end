@@ -13,7 +13,7 @@
 Clone into a staging directory:
 
 ```bash
-git clone <REPOSITORY_URL> ~/smart-fire-release
+git clone https://github.com/Supakorn289/smart-fire-detection-v2.git ~/smart-fire-release
 cd ~/smart-fire-release
 ```
 

@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: "Prammano"
     given-names: "Supakorn"
-repository-code: "https://github.com/<GITHUB_USERNAME>/smart-fire-detection-v2"
+repository-code: "https://github.com/Supakorn289/smart-fire-detection-v2"
 version: "1.0.0"
 date-released: "2026-09-28"
 keywords:
