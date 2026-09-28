@@ -1,2 +1,101 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Virtual environments
 venv/
 .venv/
+env/
+ENV/
+
+# Secrets / environments
+.env
+.env.*
+!.env.example
+production.env
+*.secret
+*.secrets
+manager.token
+*.token
+credentials/
+secrets/
+
+# Smart Fire runtime/site calibration
+calibration/*
+!calibration/.gitkeep
+calibration/.manager/
+
+# Generated manager/runtime state
+**/candidates/
+**/revisions/
+**/activations/
+**/wizard/
+**/sites.json
+**/*.lock
+
+# Site-specific/generated calibration
+**/site.json
+**/distance_global.json
+**/camera_intrinsics.json
+**/preset_rotation_ACTIVE.json
+**/preset_rotation_ACTIVE.meta.json
+**/preset_rotation_candidate*.json
+**/preset_rotation_FINAL.json
+
+# Generated captures / runs
+**/captures/
+**/calibration_sessions/
+**/sweep_runs/
+**/run_*/
+**/debug/
+**/archive/
+*.jpg
+*.jpeg
+*.png
+*.webp
+
+# Allow public documentation media
+!assets/**/*.jpg
+!assets/**/*.jpeg
+!assets/**/*.png
+!assets/**/*.webp
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.png
+!docs/**/*.webp
+!research/figures/**/*.jpg
+!research/figures/**/*.jpeg
+!research/figures/**/*.png
+!research/figures/**/*.webp
+
+# Runtime outputs
+static/status.json
+static/events/
+logs/
+*.log
+*.pid
+*.sock
+*.tmp
+*.bak
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Model artifacts: only canonical paths are allowed
+*.pt
+!models/fire.pt
+!models/final/fire_smoke_r3_e6_final.pt
+models/*_openvino_model/
+models/**/archive/
