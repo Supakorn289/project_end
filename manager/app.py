@@ -42,6 +42,13 @@ from manager.security import configure_session_security
 from manager.settings_api import settings_bp
 from manager.commissioning_api import commissioning_bp
 from manager.calibration_adapter_api import calibration_adapter_bp
+from manager.geometry_adapter_api import geometry_adapter_bp
+from manager.telegram_setup_api import telegram_setup_bp
+from manager.camera_setup_api import camera_setup_bp
+from manager.intrinsics_setup_api import intrinsics_setup_bp
+from manager.final_verification_api import final_verification_bp
+from manager.revision_api import revision_bp
+from manager.activation_api import activation_bp
 from manager.wizard_api import wizard_bp
 
 
@@ -63,6 +70,41 @@ app.register_blueprint(
 
 app.register_blueprint(
     calibration_adapter_bp
+)
+
+
+app.register_blueprint(
+    geometry_adapter_bp
+)
+
+
+app.register_blueprint(
+    telegram_setup_bp
+)
+
+
+app.register_blueprint(
+    camera_setup_bp
+)
+
+
+app.register_blueprint(
+    intrinsics_setup_bp
+)
+
+
+app.register_blueprint(
+    final_verification_bp
+)
+
+
+app.register_blueprint(
+    revision_bp
+)
+
+
+app.register_blueprint(
+    activation_bp
 )
 
 

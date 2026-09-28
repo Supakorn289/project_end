@@ -1,0 +1,195 @@
+{
+  "version": 2,
+  "created_at": 1788157451.8335307,
+  "status": "intrinsics_calibrated",
+  "valid_for_production": true,
+  "frame_width": 1280,
+  "frame_height": 720,
+  "pattern_inner_corners": [
+    9,
+    6
+  ],
+  "input_views": 25,
+  "views_used": 19,
+  "views_rejected": 6,
+  "camera_matrix": [
+    [
+      955.1332311882453,
+      0.0,
+      658.4295188280958
+    ],
+    [
+      0.0,
+      956.9770866399078,
+      396.10136328423596
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "fx_px": 955.1332311882453,
+  "fy_px": 956.9770866399078,
+  "cx_px": 658.4295188280958,
+  "cy_px": 396.10136328423596,
+  "distortion_coefficients": [
+    -0.2983445608223523,
+    0.00278311421449681,
+    -0.0009641351221313622,
+    -0.0014664614262354222,
+    0.0
+  ],
+  "distortion_model": {
+    "k1": -0.2983445608223523,
+    "k2": 0.00278311421449681,
+    "p1": -0.0009641351221313622,
+    "p2": -0.0014664614262354222,
+    "k3": 0.0
+  },
+  "fit_model": {
+    "use_intrinsic_guess": true,
+    "initial_hfov_deg": 60.195288,
+    "k3_fixed": true,
+    "zero_tangential_distortion": false,
+    "max_view_error_px": 1.5,
+    "min_views": 12,
+    "max_reject": 8
+  },
+  "effective_hfov_deg": 67.5934241523837,
+  "effective_vfov_deg": 41.13027837828743,
+  "left_half_fov_deg": 34.58078034021651,
+  "right_half_fov_deg": 33.0126438121672,
+  "fit": {
+    "opencv_rms_px": 0.4885140018187905,
+    "mean_reprojection_px": 0.4184547096205979,
+    "max_reprojection_px": 1.0626843236471797,
+    "quality": "good"
+  },
+  "used_files": [
+    "calib_003.jpg",
+    "calib_004.jpg",
+    "calib_005.jpg",
+    "calib_006.jpg",
+    "calib_007.jpg",
+    "calib_008.jpg",
+    "calib_009.jpg",
+    "calib_010.jpg",
+    "calib_014.jpg",
+    "calib_015.jpg",
+    "calib_016.jpg",
+    "calib_017.jpg",
+    "calib_018.jpg",
+    "calib_019.jpg",
+    "calib_021.jpg",
+    "calib_022.jpg",
+    "calib_023.jpg",
+    "calib_024.jpg",
+    "calib_025.jpg"
+  ],
+  "rejected_files": [
+    {
+      "filename": "calib_012.jpg",
+      "error_px": 8.30876132955707
+    },
+    {
+      "filename": "calib_001.jpg",
+      "error_px": 7.141334147893182
+    },
+    {
+      "filename": "calib_020.jpg",
+      "error_px": 6.574843650670465
+    },
+    {
+      "filename": "calib_002.jpg",
+      "error_px": 6.462506953517929
+    },
+    {
+      "filename": "calib_013.jpg",
+      "error_px": 6.425660440068745
+    },
+    {
+      "filename": "calib_011.jpg",
+      "error_px": 1.5616266480118612
+    }
+  ],
+  "per_view_error_px": {
+    "calib_003.jpg": 0.2166212676624291,
+    "calib_004.jpg": 0.3271042637394932,
+    "calib_005.jpg": 0.4620395836644579,
+    "calib_006.jpg": 0.23447629011421345,
+    "calib_007.jpg": 0.4548571135884801,
+    "calib_008.jpg": 0.3061703276637702,
+    "calib_009.jpg": 0.7250209164068631,
+    "calib_010.jpg": 0.4176819789052947,
+    "calib_014.jpg": 0.33619919276075333,
+    "calib_015.jpg": 0.90902056259298,
+    "calib_016.jpg": 1.0626843236471797,
+    "calib_017.jpg": 0.3974729531461281,
+    "calib_018.jpg": 0.7433882787380279,
+    "calib_019.jpg": 0.3289103192872783,
+    "calib_021.jpg": 0.27571369727022144,
+    "calib_022.jpg": 0.22430436530074635,
+    "calib_023.jpg": 0.22824231945728024,
+    "calib_024.jpg": 0.1448867009706361,
+    "calib_025.jpg": 0.15584502787512644
+  },
+  "capture_coverage": {
+    "board_center_range": {
+      "min_x_px": 360.8899230957031,
+      "max_x_px": 1026.08251953125,
+      "min_y_px": 181.99090576171875,
+      "max_y_px": 546.2852783203125
+    },
+    "coverage_fraction": {
+      "calib_003.jpg": 0.07343100136205445,
+      "calib_004.jpg": 0.07819369379466631,
+      "calib_005.jpg": 0.08122901929108643,
+      "calib_006.jpg": 0.08120036914994165,
+      "calib_007.jpg": 0.07434994616023585,
+      "calib_008.jpg": 0.0784717361314228,
+      "calib_009.jpg": 0.028696677913140876,
+      "calib_010.jpg": 0.03858825838354177,
+      "calib_014.jpg": 0.06820409017597512,
+      "calib_015.jpg": 0.07763003034918446,
+      "calib_016.jpg": 0.07437073244101233,
+      "calib_017.jpg": 0.06864249916652954,
+      "calib_018.jpg": 0.06629919658701358,
+      "calib_019.jpg": 0.06381224602058662,
+      "calib_021.jpg": 0.05844350393063451,
+      "calib_022.jpg": 0.06725468831537253,
+      "calib_023.jpg": 0.05574709121362806,
+      "calib_024.jpg": 0.050570108146092835,
+      "calib_025.jpg": 0.0422501244412514
+    },
+    "sharpness": {
+      "calib_003.jpg": 166.25851314538914,
+      "calib_004.jpg": 101.12634551990183,
+      "calib_005.jpg": 104.13564141977093,
+      "calib_006.jpg": 124.57961014048144,
+      "calib_007.jpg": 167.9103124474313,
+      "calib_008.jpg": 167.4843684601914,
+      "calib_009.jpg": 166.78551317003036,
+      "calib_010.jpg": 162.22750068494534,
+      "calib_014.jpg": 146.01312922677874,
+      "calib_015.jpg": 116.37435185479059,
+      "calib_016.jpg": 137.93672555511847,
+      "calib_017.jpg": 140.17851321855716,
+      "calib_018.jpg": 144.8337321715885,
+      "calib_019.jpg": 153.99293866338732,
+      "calib_021.jpg": 137.21889778866122,
+      "calib_022.jpg": 110.24595238575408,
+      "calib_023.jpg": 115.23343319019745,
+      "calib_024.jpg": 128.21850854763457,
+      "calib_025.jpg": 136.28441214192233
+    }
+  },
+  "sanity_warnings": [],
+  "notes": [
+    "Use camera intrinsics for pixel-to-ray conversion.",
+    "Distortion should be removed before pixel bearing calculation.",
+    "This file does not define PTZ preset world bearings.",
+    "This file does not define True North.",
+    "Production use is allowed only when valid_for_production=true."
+  ]
+}

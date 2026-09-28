@@ -1,0 +1,3971 @@
+#!/usr/bin/python3
+
+from __future__ import annotations
+
+import time
+
+import shutil
+
+import re
+
+import hashlib
+
+import fcntl
+
+import grp
+import ipaddress
+import json
+import os
+import pwd
+import socket
+import struct
+import subprocess
+import tempfile
+
+from datetime import (
+    datetime,
+    timezone,
+)
+
+from pathlib import Path
+
+
+SOCKET_PATH = Path(
+    "/run/smart-fire-manager-agent/"
+    "control.sock"
+)
+
+ENV_FILE = Path(
+    "/etc/smart-fire-detection/"
+    "production.env"
+)
+
+BACKUP_DIR = Path(
+    "/etc/smart-fire-detection/"
+    "backups"
+)
+
+DETECTION_SERVICE = (
+    "smart-fire-detection.service"
+)
+
+
+ALLOWED = {
+    "CAMERA_IP",
+    "CAMERA_HTTP_PORT",
+    "RTSP_PORT",
+    "RTSP_PATH",
+    "ENABLE_TRUE_NORTH",
+    "ENABLE_GPS",
+    "FUSION_ANCHOR_MAX_AGE_SEC",
+    "FUSION_PENDING_SAFETY_SEC",
+}
+
+
+DEFAULTS = {
+    "CAMERA_HTTP_PORT": "81",
+    "RTSP_PORT": "10554",
+    "RTSP_PATH": "/tcp/av0_0",
+    "ENABLE_TRUE_NORTH": "0",
+    "ENABLE_GPS": "0",
+    "FUSION_ANCHOR_MAX_AGE_SEC": "15",
+    "FUSION_PENDING_SAFETY_SEC": "90",
+}
+
+
+def response(
+    ok,
+    **kwargs,
+):
+
+    result = {
+        "ok": bool(ok),
+    }
+
+    result.update(
+        kwargs
+    )
+
+    return result
+
+
+def authorize_peer(
+    client,
+):
+
+    if not hasattr(
+        socket,
+        "SO_PEERCRED",
+    ):
+
+        raise RuntimeError(
+            "SO_PEERCRED unavailable"
+        )
+
+
+    size = struct.calcsize(
+        "3i"
+    )
+
+
+    raw = client.getsockopt(
+        socket.SOL_SOCKET,
+        socket.SO_PEERCRED,
+        size,
+    )
+
+
+    pid, uid, gid = (
+        struct.unpack(
+            "3i",
+            raw,
+        )
+    )
+
+
+    fire = pwd.getpwnam(
+        "fire"
+    )
+
+
+    allowed = bool(
+        uid == 0
+        or
+        (
+            uid == fire.pw_uid
+            and
+            gid == fire.pw_gid
+        )
+    )
+
+
+    if not allowed:
+
+        raise PermissionError(
+            "unauthorized unix peer"
+        )
+
+
+    return {
+        "pid":
+            int(
+                pid
+            ),
+
+        "uid":
+            int(
+                uid
+            ),
+
+        "gid":
+            int(
+                gid
+            ),
+    }
+
+
+def load_env():
+
+    result = {}
+
+    if not ENV_FILE.exists():
+        raise RuntimeError(
+            f"Missing {ENV_FILE}"
+        )
+
+    for raw in (
+        ENV_FILE
+        .read_text(
+            encoding="utf-8"
+        )
+        .splitlines()
+    ):
+
+        line = raw.strip()
+
+        if (
+            not line
+            or line.startswith("#")
+            or "=" not in line
+        ):
+            continue
+
+        key, value = (
+            line.split(
+                "=",
+                1,
+            )
+        )
+
+        key = key.strip()
+
+        value = (
+            value.strip()
+        )
+
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {
+                "'",
+                '"',
+            }
+        ):
+            value = value[
+                1:-1
+            ]
+
+        result[key] = value
+
+    return result
+
+
+def public_settings():
+
+    env = load_env()
+
+    values = {}
+
+    sources = {}
+
+    for key in sorted(
+        ALLOWED
+    ):
+
+        if (
+            key in env
+            and env[key] != ""
+        ):
+
+            values[key] = (
+                env[key]
+            )
+
+            sources[key] = (
+                "production.env"
+            )
+
+        elif key in DEFAULTS:
+
+            values[key] = (
+                DEFAULTS[key]
+            )
+
+            sources[key] = (
+                "runtime-default"
+            )
+
+        else:
+
+            values[key] = None
+
+            sources[key] = (
+                "missing"
+            )
+
+    return response(
+        True,
+        values=values,
+        sources=sources,
+    )
+
+
+def validate(
+    key,
+    value,
+):
+
+    value = str(
+        value
+    ).strip()
+
+
+    if key == "CAMERA_IP":
+
+        ipaddress.ip_address(
+            value
+        )
+
+
+    elif key in {
+        "CAMERA_HTTP_PORT",
+        "RTSP_PORT",
+    }:
+
+        value = str(
+            int(value)
+        )
+
+        number = int(
+            value
+        )
+
+        if not (
+            1 <= number <= 65535
+        ):
+            raise ValueError(
+                f"{key}: invalid port"
+            )
+
+
+    elif key == "RTSP_PATH":
+
+        if (
+            not value.startswith("/")
+            or any(
+                c.isspace()
+                for c in value
+            )
+        ):
+            raise ValueError(
+                "Invalid RTSP_PATH"
+            )
+
+
+    elif key in {
+        "ENABLE_TRUE_NORTH",
+        "ENABLE_GPS",
+    }:
+
+        table = {
+            "1": "1",
+            "0": "0",
+            "true": "1",
+            "false": "0",
+            "on": "1",
+            "off": "0",
+            "yes": "1",
+            "no": "0",
+        }
+
+        normalized = (
+            value.lower()
+        )
+
+        if normalized not in table:
+            raise ValueError(
+                f"{key}: expected 0/1"
+            )
+
+        value = table[
+            normalized
+        ]
+
+
+    elif key == (
+        "FUSION_ANCHOR_MAX_AGE_SEC"
+    ):
+
+        number = float(
+            value
+        )
+
+        if not (
+            5.0
+            <= number
+            <= 120.0
+        ):
+            raise ValueError(
+                "Anchor age must be "
+                "5-120 seconds"
+            )
+
+        value = f"{number:g}"
+
+
+    elif key == (
+        "FUSION_PENDING_SAFETY_SEC"
+    ):
+
+        number = float(
+            value
+        )
+
+        if not (
+            15.0
+            <= number
+            <= 600.0
+        ):
+            raise ValueError(
+                "Safety timeout must be "
+                "15-600 seconds"
+            )
+
+        value = f"{number:g}"
+
+
+    else:
+
+        raise ValueError(
+            f"Setting not allowed: {key}"
+        )
+
+
+    if any(
+        char in value
+        for char in (
+            "\n",
+            "\r",
+            "\x00",
+        )
+    ):
+        raise ValueError(
+            "Invalid control character"
+        )
+
+
+    return value
+
+
+def validate_payload(
+    payload,
+):
+
+    if not isinstance(
+        payload,
+        dict,
+    ):
+        raise ValueError(
+            "settings must be object"
+        )
+
+
+    unknown = (
+        set(payload)
+        - ALLOWED
+    )
+
+    if unknown:
+
+        raise ValueError(
+            "Unsupported settings: "
+            + ", ".join(
+                sorted(
+                    unknown
+                )
+            )
+        )
+
+
+    return {
+        key: validate(
+            key,
+            value,
+        )
+
+        for (
+            key,
+            value,
+        )
+        in payload.items()
+    }
+
+
+def atomic_write(
+    values,
+):
+
+    original = (
+        ENV_FILE.read_bytes()
+    )
+
+
+    BACKUP_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+    stamp = (
+        datetime.now(
+            timezone.utc
+        )
+        .strftime(
+            "%Y%m%dT%H%M%S"
+        )
+    )
+
+
+    backup = (
+        BACKUP_DIR
+        /
+        (
+            "production.env."
+            + stamp
+        )
+    )
+
+
+    backup.write_bytes(
+        original
+    )
+
+    os.chmod(
+        backup,
+        0o600,
+    )
+
+
+    original_lines = (
+        original
+        .decode(
+            "utf-8"
+        )
+        .splitlines()
+    )
+
+
+    replace_keys = set(
+        values
+    )
+
+    output = []
+
+
+    for line in original_lines:
+
+        stripped = (
+            line.strip()
+        )
+
+        if (
+            "=" in stripped
+            and
+            not stripped.startswith("#")
+        ):
+
+            key = (
+                stripped
+                .split(
+                    "=",
+                    1,
+                )[0]
+                .strip()
+            )
+
+            if key in replace_keys:
+                continue
+
+        output.append(
+            line
+        )
+
+
+    for key in sorted(
+        values
+    ):
+
+        output.append(
+            f"{key}={values[key]}"
+        )
+
+
+    content = (
+        "\n".join(
+            output
+        ).rstrip()
+        + "\n"
+    ).encode(
+        "utf-8"
+    )
+
+
+    fd, tmp = tempfile.mkstemp(
+        dir=str(
+            ENV_FILE.parent
+        ),
+        prefix=".production.env.",
+    )
+
+
+    try:
+
+        with os.fdopen(
+            fd,
+            "wb",
+        ) as handle:
+
+            handle.write(
+                content
+            )
+
+            handle.flush()
+
+            os.fsync(
+                handle.fileno()
+            )
+
+
+        os.chmod(
+            tmp,
+            0o600,
+        )
+
+
+        os.replace(
+            tmp,
+            ENV_FILE,
+        )
+
+
+    finally:
+
+        try:
+            os.unlink(
+                tmp
+            )
+
+        except FileNotFoundError:
+            pass
+
+
+    return (
+        original,
+        backup,
+    )
+
+
+def detection_active():
+
+    result = subprocess.run(
+        [
+            "/usr/bin/systemctl",
+            "is-active",
+            "--quiet",
+            DETECTION_SERVICE,
+        ],
+        timeout=10,
+        check=False,
+    )
+
+    return (
+        result.returncode
+        == 0
+    )
+
+
+def detection_enabled():
+
+    result = subprocess.run(
+        [
+            "/usr/bin/systemctl",
+            "is-enabled",
+            "--quiet",
+            DETECTION_SERVICE,
+        ],
+        timeout=10,
+        check=False,
+    )
+
+
+    return (
+        result.returncode
+        == 0
+    )
+
+
+def restart_detection():
+
+    result = subprocess.run(
+        [
+            "/usr/bin/systemctl",
+            "restart",
+            DETECTION_SERVICE,
+        ],
+
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+
+    if (
+        result.returncode == 0
+        and detection_active()
+    ):
+
+        return (
+            True,
+            "active",
+        )
+
+
+    message = (
+        result.stderr.strip()
+        or
+        result.stdout.strip()
+        or
+        "restart failed"
+    )
+
+    return (
+        False,
+        message,
+    )
+
+
+
+# ============================================================
+# Safe Existing Tool Runner
+# ============================================================
+
+PROJECT_ROOT = Path(
+    "/opt/smart-fire-detection-v2"
+)
+
+PROJECT_PYTHON = str(
+    PROJECT_ROOT
+    / "venv"
+    / "bin"
+    / "python"
+)
+
+
+SAFE_MANAGER_TOOLS = {
+
+    "preflight.offline": {
+        "command": [
+            PROJECT_PYTHON,
+            str(
+                PROJECT_ROOT
+                / "preflight.py"
+            ),
+            "--offline",
+        ],
+        "timeout": 120,
+        "requires_detection_stopped":
+            False,
+    },
+
+    "model.inspect": {
+        "command": [
+            PROJECT_PYTHON,
+            str(
+                PROJECT_ROOT
+                / "inspect_model.py"
+            ),
+        ],
+        "timeout": 180,
+        "requires_detection_stopped":
+            True,
+    },
+
+    "camera.test": {
+        "command": [
+            PROJECT_PYTHON,
+            str(
+                PROJECT_ROOT
+                / "test_camera.py"
+            ),
+        ],
+        "timeout": 60,
+        "requires_detection_stopped":
+            True,
+    },
+
+    "ptz.test": {
+        "command": [
+            PROJECT_PYTHON,
+            str(
+                PROJECT_ROOT
+                / "test_ptz.py"
+            ),
+        ],
+        "timeout": 180,
+        "requires_detection_stopped":
+            True,
+    },
+
+    "ptz.frame_sync": {
+        "command": [
+            PROJECT_PYTHON,
+            str(
+                PROJECT_ROOT
+                / "test_ptz_frame_sync.py"
+            ),
+        ],
+        "timeout": 180,
+        "requires_detection_stopped":
+            True,
+    },
+
+    "telegram.test": {
+        "command": [
+            PROJECT_PYTHON,
+            str(
+                PROJECT_ROOT
+                / "test_telegram.py"
+            ),
+        ],
+        "timeout": 45,
+        "requires_detection_stopped":
+            False,
+    },
+
+    "full_sweep": {
+        "command": [
+            PROJECT_PYTHON,
+            str(
+                PROJECT_ROOT
+                / "test_full_sweep.py"
+            ),
+            "--cycles",
+            "1",
+        ],
+        "timeout": 300,
+        "requires_detection_stopped":
+            True,
+    },
+}
+
+
+def _service_action(
+    action,
+):
+
+    process = subprocess.run(
+        [
+            "/usr/bin/systemctl",
+            action,
+            DETECTION_SERVICE,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+    return (
+        process.returncode == 0,
+        (
+            process.stderr.strip()
+            or
+            process.stdout.strip()
+        ),
+    )
+
+
+def run_existing_tool(
+    tool_id,
+):
+
+    tool_id = str(
+        tool_id
+        or ""
+    )
+
+
+    if tool_id not in (
+        SAFE_MANAGER_TOOLS
+    ):
+
+        return response(
+            False,
+            error="tool_not_allowed",
+        )
+
+
+    spec = (
+        SAFE_MANAGER_TOOLS[
+            tool_id
+        ]
+    )
+
+
+    fire = pwd.getpwnam(
+        "fire"
+    )
+
+
+    was_active = (
+        detection_active()
+    )
+
+
+    stopped_by_runner = False
+
+    restore_error = None
+
+
+    try:
+
+        if (
+            spec[
+                "requires_detection_stopped"
+            ]
+            and
+            was_active
+        ):
+
+            ok, detail = (
+                _service_action(
+                    "stop"
+                )
+            )
+
+            if not ok:
+
+                return response(
+                    False,
+                    error=(
+                        "cannot_stop_detection"
+                    ),
+                    detail=detail,
+                )
+
+
+            stopped_by_runner = True
+
+
+        started_at = (
+            datetime.now(
+                timezone.utc
+            )
+            .isoformat()
+        )
+
+
+        try:
+
+            process = subprocess.run(
+                spec[
+                    "command"
+                ],
+
+                cwd=str(
+                    PROJECT_ROOT
+                ),
+
+                env=os.environ.copy(),
+
+                capture_output=True,
+                text=True,
+
+                timeout=int(
+                    spec[
+                        "timeout"
+                    ]
+                ),
+
+                check=False,
+
+                user=fire.pw_uid,
+                group=fire.pw_gid,
+            )
+
+
+            return_code = (
+                int(
+                    process.returncode
+                )
+            )
+
+            stdout = (
+                process.stdout
+                or ""
+            )
+
+            stderr = (
+                process.stderr
+                or ""
+            )
+
+            timed_out = False
+
+
+        except subprocess.TimeoutExpired as exc:
+
+            return_code = 124
+
+            stdout = (
+                exc.stdout
+                or ""
+            )
+
+            stderr = (
+                exc.stderr
+                or ""
+            )
+
+            if isinstance(
+                stdout,
+                bytes,
+            ):
+                stdout = stdout.decode(
+                    "utf-8",
+                    errors="replace",
+                )
+
+            if isinstance(
+                stderr,
+                bytes,
+            ):
+                stderr = stderr.decode(
+                    "utf-8",
+                    errors="replace",
+                )
+
+            timed_out = True
+
+
+        finished_at = (
+            datetime.now(
+                timezone.utc
+            )
+            .isoformat()
+        )
+
+
+        # Limit response size.
+        stdout = str(
+            stdout
+        )[-50000:]
+
+        stderr = str(
+            stderr
+        )[-20000:]
+
+
+        result = response(
+            (
+                return_code == 0
+                and
+                not timed_out
+            ),
+
+            tool_id=tool_id,
+
+            return_code=return_code,
+
+            timed_out=timed_out,
+
+            started_at=started_at,
+
+            finished_at=finished_at,
+
+            stdout=stdout,
+
+            stderr=stderr,
+
+            detection_was_active=
+                was_active,
+
+            detection_stopped_by_runner=
+                stopped_by_runner,
+        )
+
+
+    except Exception as exc:
+
+        result = response(
+            False,
+
+            error=(
+                f"{type(exc).__name__}: "
+                f"{exc}"
+            ),
+
+            tool_id=tool_id,
+        )
+
+
+    finally:
+
+        if stopped_by_runner:
+
+            ok, detail = (
+                _service_action(
+                    "start"
+                )
+            )
+
+            if not ok:
+
+                restore_error = (
+                    detail
+                    or
+                    "Detection restore failed"
+                )
+
+
+    result[
+        "detection_restored"
+    ] = (
+        (
+            detection_active()
+            == was_active
+        )
+    )
+
+
+    if restore_error:
+
+        result[
+            "ok"
+        ] = False
+
+        result[
+            "restore_error"
+        ] = restore_error
+
+
+    return result
+
+
+
+
+# ============================================================
+# Atomic Revision Activation
+# ============================================================
+
+CALIBRATION_ROOT = Path(
+    "/opt/smart-fire-detection-v2/calibration"
+)
+
+REVISION_ROOT = (
+    CALIBRATION_ROOT
+    / ".manager"
+    / "revisions"
+)
+
+ACTIVATION_RECORD_ROOT = (
+    CALIBRATION_ROOT
+    / ".manager"
+    / "activations"
+)
+
+ACTIVATION_BACKUP_ROOT = Path(
+    "/etc/smart-fire-detection/"
+    "activation-backups"
+)
+
+ACTIVATION_LOCK = Path(
+    "/etc/smart-fire-detection/"
+    "activation.lock"
+)
+
+HARDWARE_LOCK = (
+    CALIBRATION_ROOT
+    / ".manager"
+    / "hardware.lock"
+)
+
+SITE_ID_RE = re.compile(
+    r"^[A-Za-z0-9]"
+    r"[A-Za-z0-9._-]{0,79}$"
+)
+
+REVISION_ID_RE = re.compile(
+    r"^rev-[A-Za-z0-9TZ_-]{8,80}$"
+)
+
+
+ACTIVE_FILES = {
+    "camera_intrinsics.json":
+        CALIBRATION_ROOT
+        / "camera_intrinsics.json",
+
+    "distance_global.json":
+        CALIBRATION_ROOT
+        / "distance_global.json",
+
+    "site.json":
+        CALIBRATION_ROOT
+        / "site.json",
+
+    "preset_rotation.json":
+        CALIBRATION_ROOT
+        / "preset_rotation_ACTIVE.json",
+}
+
+
+ACTIVATION_ENV_ALLOWED = {
+    "CAMERA_IP",
+    "CAMERA_PORT",
+    "CAMERA_HTTP_PORT",
+    "CAMERA_USER",
+    "CAMERA_PWD",
+    "CAMERA_ID",
+
+    "RTSP_PORT",
+    "RTSP_PATH",
+
+    "CAMERA_LAT",
+    "CAMERA_LON",
+
+    "FRAME_WIDTH",
+    "FRAME_HEIGHT",
+    "HFOV_DEG",
+
+    "TELEGRAM_TOKEN",
+    "TELEGRAM_CHAT_ID",
+
+    "ENABLE_TRUE_NORTH",
+    "ENABLE_GPS",
+}
+
+
+def _activation_json(
+    path,
+):
+
+    return json.loads(
+        Path(
+            path
+        ).read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def _activation_sha256(
+    path,
+):
+
+    digest = hashlib.sha256()
+
+
+    with Path(
+        path
+    ).open(
+        "rb"
+    ) as handle:
+
+        while True:
+
+            block = handle.read(
+                1024 * 1024
+            )
+
+
+            if not block:
+                break
+
+
+            digest.update(
+                block
+            )
+
+
+    return digest.hexdigest()
+
+
+def _activation_safe_ids(
+    site_id,
+    revision_id,
+):
+
+    site_id = str(
+        site_id
+        or ""
+    ).strip()
+
+    revision_id = str(
+        revision_id
+        or ""
+    ).strip()
+
+
+    if not SITE_ID_RE.fullmatch(
+        site_id
+    ):
+
+        raise ValueError(
+            "invalid site_id"
+        )
+
+
+    if not REVISION_ID_RE.fullmatch(
+        revision_id
+    ):
+
+        raise ValueError(
+            "invalid revision_id"
+        )
+
+
+    return (
+        site_id,
+        revision_id,
+    )
+
+
+def _no_control(
+    key,
+    value,
+):
+
+    value = str(
+        value
+    )
+
+
+    if any(
+        char in value
+        for char in (
+            "\n",
+            "\r",
+            "\x00",
+        )
+    ):
+
+        raise ValueError(
+            f"{key}: invalid control character"
+        )
+
+
+    return value
+
+
+def _normalize_activation_env(
+    values,
+    mode,
+):
+
+    if not isinstance(
+        values,
+        dict,
+    ):
+
+        raise ValueError(
+            "environment must be object"
+        )
+
+
+    unknown = (
+        set(
+            values
+        )
+        -
+        ACTIVATION_ENV_ALLOWED
+    )
+
+
+    if unknown:
+
+        raise ValueError(
+            "unsupported activation env: "
+            +
+            ", ".join(
+                sorted(
+                    unknown
+                )
+            )
+        )
+
+
+    result = {}
+
+
+    for key, raw in values.items():
+
+        value = _no_control(
+            key,
+            raw,
+        )
+
+
+        if key == "CAMERA_IP":
+
+            ipaddress.ip_address(
+                value
+            )
+
+
+        elif key in {
+            "CAMERA_PORT",
+            "CAMERA_HTTP_PORT",
+            "RTSP_PORT",
+        }:
+
+            number = int(
+                value
+            )
+
+
+            if not (
+                1
+                <= number
+                <= 65535
+            ):
+
+                raise ValueError(
+                    f"{key}: invalid port"
+                )
+
+
+            value = str(
+                number
+            )
+
+
+        elif key in {
+            "FRAME_WIDTH",
+            "FRAME_HEIGHT",
+        }:
+
+            number = int(
+                value
+            )
+
+
+            if not (
+                1
+                <= number
+                <= 10000
+            ):
+
+                raise ValueError(
+                    f"{key}: invalid dimension"
+                )
+
+
+            value = str(
+                number
+            )
+
+
+        elif key == "HFOV_DEG":
+
+            number = float(
+                value
+            )
+
+
+            if not (
+                1.0
+                < number
+                < 179.0
+            ):
+
+                raise ValueError(
+                    "HFOV_DEG invalid"
+                )
+
+
+            value = f"{number:.10g}"
+
+
+        elif key == "CAMERA_LAT":
+
+            number = float(
+                value
+            )
+
+
+            if not (
+                -90.0
+                <= number
+                <= 90.0
+            ):
+
+                raise ValueError(
+                    "CAMERA_LAT invalid"
+                )
+
+
+            value = f"{number:.10f}"
+
+
+        elif key == "CAMERA_LON":
+
+            number = float(
+                value
+            )
+
+
+            if not (
+                -180.0
+                <= number
+                <= 180.0
+            ):
+
+                raise ValueError(
+                    "CAMERA_LON invalid"
+                )
+
+
+            value = f"{number:.10f}"
+
+
+        elif key in {
+            "ENABLE_TRUE_NORTH",
+            "ENABLE_GPS",
+        }:
+
+            if value not in {
+                "0",
+                "1",
+            }:
+
+                raise ValueError(
+                    f"{key}: expected 0/1"
+                )
+
+
+        elif key == "RTSP_PATH":
+
+            if (
+                not value.startswith(
+                    "/"
+                )
+                or
+                any(
+                    char.isspace()
+                    for char
+                    in value
+                )
+            ):
+
+                raise ValueError(
+                    "RTSP_PATH invalid"
+                )
+
+
+        result[
+            key
+        ] = value
+
+
+    required_camera = {
+        "CAMERA_IP",
+        "CAMERA_PORT",
+        "CAMERA_USER",
+        "CAMERA_PWD",
+        "RTSP_PORT",
+        "RTSP_PATH",
+    }
+
+
+    missing_camera = {
+        key
+        for key
+        in required_camera
+        if not result.get(
+            key
+        )
+    }
+
+
+    if missing_camera:
+
+        raise ValueError(
+            "camera configuration missing: "
+            +
+            ", ".join(
+                sorted(
+                    missing_camera
+                )
+            )
+        )
+
+
+    # Keep legacy Settings UI in sync.
+    result[
+        "CAMERA_HTTP_PORT"
+    ] = result[
+        "CAMERA_PORT"
+    ]
+
+
+    # Force config.py to rebuild rtsp CAMERA_ID.
+    result[
+        "CAMERA_ID"
+    ] = ""
+
+
+    if mode == "PRODUCTION":
+
+        production_required = {
+            "CAMERA_LAT",
+            "CAMERA_LON",
+            "TELEGRAM_TOKEN",
+            "TELEGRAM_CHAT_ID",
+        }
+
+
+        missing = {
+            key
+            for key
+            in production_required
+            if not result.get(
+                key
+            )
+        }
+
+
+        if missing:
+
+            raise ValueError(
+                "production environment missing: "
+                +
+                ", ".join(
+                    sorted(
+                        missing
+                    )
+                )
+            )
+
+
+        result[
+            "ENABLE_TRUE_NORTH"
+        ] = "1"
+
+        result[
+            "ENABLE_GPS"
+        ] = "1"
+
+
+    else:
+
+        # Never inherit another Site's coordinates
+        # or notification destination in LAB.
+        result.setdefault(
+            "CAMERA_LAT",
+            "nan",
+        )
+
+        result.setdefault(
+            "CAMERA_LON",
+            "nan",
+        )
+
+        result.setdefault(
+            "TELEGRAM_TOKEN",
+            "",
+        )
+
+        result.setdefault(
+            "TELEGRAM_CHAT_ID",
+            "",
+        )
+
+        result[
+            "ENABLE_TRUE_NORTH"
+        ] = "0"
+
+        result[
+            "ENABLE_GPS"
+        ] = "0"
+
+
+    return result
+
+
+def _build_activation_environment(
+    revision_dir,
+    site_record,
+    mode,
+):
+
+    artifacts = (
+        revision_dir
+        / "artifacts"
+    )
+
+
+    camera_file = (
+        artifacts
+        / "camera_connection.json"
+    )
+
+
+    if not camera_file.exists():
+
+        raise ValueError(
+            "camera_connection.json missing"
+        )
+
+
+    camera_data = (
+        _activation_json(
+            camera_file
+        )
+    )
+
+
+    camera = (
+        camera_data.get(
+            "runtime_env",
+            {}
+        )
+    )
+
+
+    if not isinstance(
+        camera,
+        dict,
+    ):
+
+        raise ValueError(
+            "camera runtime_env invalid"
+        )
+
+
+    env = {}
+
+
+    for key in (
+        "CAMERA_IP",
+        "CAMERA_USER",
+        "CAMERA_PWD",
+        "RTSP_PORT",
+        "RTSP_PATH",
+    ):
+
+        if key in camera:
+
+            env[
+                key
+            ] = camera[
+                key
+            ]
+
+
+    camera_port = (
+        camera.get(
+            "CAMERA_PORT"
+        )
+        or
+        camera.get(
+            "CAMERA_HTTP_PORT"
+        )
+    )
+
+
+    if camera_port is not None:
+
+        env[
+            "CAMERA_PORT"
+        ] = camera_port
+
+
+    telegram_file = (
+        artifacts
+        / "telegram.json"
+    )
+
+
+    if telegram_file.exists():
+
+        telegram = (
+            _activation_json(
+                telegram_file
+            )
+        )
+
+
+        runtime_env = (
+            telegram.get(
+                "runtime_env"
+            )
+        )
+
+
+        if isinstance(
+            runtime_env,
+            dict,
+        ):
+
+            for key in (
+                "TELEGRAM_TOKEN",
+                "TELEGRAM_CHAT_ID",
+            ):
+
+                if key in runtime_env:
+
+                    env[
+                        key
+                    ] = runtime_env[
+                        key
+                    ]
+
+
+        else:
+
+            token = (
+                telegram.get(
+                    "TELEGRAM_TOKEN"
+                )
+                or
+                telegram.get(
+                    "telegram_token"
+                )
+                or
+                telegram.get(
+                    "token"
+                )
+            )
+
+            chat_id = (
+                telegram.get(
+                    "TELEGRAM_CHAT_ID"
+                )
+                or
+                telegram.get(
+                    "telegram_chat_id"
+                )
+                or
+                telegram.get(
+                    "chat_id"
+                )
+            )
+
+
+            if token is not None:
+
+                env[
+                    "TELEGRAM_TOKEN"
+                ] = token
+
+
+            if chat_id is not None:
+
+                env[
+                    "TELEGRAM_CHAT_ID"
+                ] = chat_id
+
+
+    location = (
+        (
+            site_record
+            or {}
+        ).get(
+            "location"
+        )
+    )
+
+
+    if not isinstance(
+        location,
+        dict,
+    ):
+
+        location = (
+            site_record
+            or {}
+        )
+
+
+    latitude = location.get(
+        "latitude"
+    )
+
+    longitude = location.get(
+        "longitude"
+    )
+
+
+    if (
+        latitude is not None
+        and
+        longitude is not None
+    ):
+
+        env[
+            "CAMERA_LAT"
+        ] = latitude
+
+        env[
+            "CAMERA_LON"
+        ] = longitude
+
+
+    intrinsics = (
+        _activation_json(
+            artifacts
+            / "camera_intrinsics.json"
+        )
+    )
+
+
+    if (
+        intrinsics.get(
+            "frame_width"
+        )
+        is not None
+    ):
+
+        env[
+            "FRAME_WIDTH"
+        ] = intrinsics[
+            "frame_width"
+        ]
+
+
+    if (
+        intrinsics.get(
+            "frame_height"
+        )
+        is not None
+    ):
+
+        env[
+            "FRAME_HEIGHT"
+        ] = intrinsics[
+            "frame_height"
+        ]
+
+
+    if (
+        intrinsics.get(
+            "effective_hfov_deg"
+        )
+        is not None
+    ):
+
+        env[
+            "HFOV_DEG"
+        ] = intrinsics[
+            "effective_hfov_deg"
+        ]
+
+
+    return _normalize_activation_env(
+        env,
+        mode,
+    )
+
+
+def _validate_activation_revision(
+    site_id,
+    revision_id,
+):
+
+    site_id, revision_id = (
+        _activation_safe_ids(
+            site_id,
+            revision_id,
+        )
+    )
+
+
+    revision_dir = (
+        REVISION_ROOT
+        / site_id
+        / revision_id
+    ).resolve()
+
+
+    expected_parent = (
+        REVISION_ROOT
+        / site_id
+    ).resolve()
+
+
+    if (
+        revision_dir.parent
+        != expected_parent
+    ):
+
+        raise ValueError(
+            "revision path escape"
+        )
+
+
+    if not revision_dir.exists():
+
+        raise FileNotFoundError(
+            "revision not found"
+        )
+
+
+    revision = _activation_json(
+        revision_dir
+        / "revision.json"
+    )
+
+    manifest = _activation_json(
+        revision_dir
+        / "manifest.json"
+    )
+
+    verification = _activation_json(
+        revision_dir
+        / "final_verification.json"
+    )
+
+    site_record = _activation_json(
+        revision_dir
+        / "site_record.json"
+    )
+
+
+    if (
+        revision.get(
+            "site_id"
+        )
+        != site_id
+    ):
+
+        raise ValueError(
+            "revision site mismatch"
+        )
+
+
+    if not (
+        revision.get(
+            "status"
+        )
+        ==
+        "VALIDATED_CANDIDATE"
+
+        and
+
+        revision.get(
+            "candidate_ready"
+        )
+        is True
+
+        and
+
+        verification.get(
+            "candidate_ready"
+        )
+        is True
+
+        and
+
+        int(
+            verification.get(
+                "blocker_count",
+                1,
+            )
+        )
+        == 0
+    ):
+
+        raise ValueError(
+            "revision_not_validated"
+        )
+
+
+    digest = str(
+        revision.get(
+            "candidate_digest"
+        )
+        or ""
+    )
+
+
+    if (
+        not digest
+        or
+        not revision_id.endswith(
+            digest[:12]
+        )
+    ):
+
+        raise ValueError(
+            "revision digest mismatch"
+        )
+
+
+    artifacts = (
+        revision_dir
+        / "artifacts"
+    )
+
+
+    for item in manifest.get(
+        "files",
+        []
+    ):
+
+        relative = Path(
+            item[
+                "path"
+            ]
+        )
+
+
+        if (
+            relative.is_absolute()
+            or
+            ".." in relative.parts
+        ):
+
+            raise ValueError(
+                "unsafe revision artifact path"
+            )
+
+
+        artifact = (
+            artifacts
+            / relative
+        )
+
+
+        if (
+            not artifact.exists()
+            or
+            artifact.is_symlink()
+        ):
+
+            raise ValueError(
+                "revision artifact missing: "
+                +
+                relative.as_posix()
+            )
+
+
+        if (
+            _activation_sha256(
+                artifact
+            )
+            !=
+            item[
+                "sha256"
+            ]
+        ):
+
+            raise ValueError(
+                "revision artifact hash mismatch: "
+                +
+                relative.as_posix()
+            )
+
+
+    required_calibration = {
+        "camera_intrinsics.json",
+        "distance_global.json",
+        "site.json",
+        "preset_rotation.json",
+    }
+
+
+    missing_calibration = {
+        name
+        for name
+        in required_calibration
+        if not (
+            artifacts
+            / name
+        ).exists()
+    }
+
+
+    if missing_calibration:
+
+        raise ValueError(
+            "revision calibration missing: "
+            +
+            ", ".join(
+                sorted(
+                    missing_calibration
+                )
+            )
+        )
+
+
+    mode = str(
+        (
+            site_record
+            or {}
+        ).get(
+            "mode"
+        )
+        or
+        verification.get(
+            "mode"
+        )
+        or
+        "LAB"
+    ).upper()
+
+
+    if mode not in {
+        "LAB",
+        "PRODUCTION",
+    }:
+
+        raise ValueError(
+            "invalid site mode"
+        )
+
+
+    env = (
+        _build_activation_environment(
+            revision_dir,
+            site_record,
+            mode,
+        )
+    )
+
+
+    return {
+        "site_id":
+            site_id,
+
+        "revision_id":
+            revision_id,
+
+        "revision_dir":
+            revision_dir,
+
+        "revision":
+            revision,
+
+        "mode":
+            mode,
+
+        "environment":
+            env,
+    }
+
+
+def _atomic_env_merge(
+    values,
+):
+
+    original = (
+        ENV_FILE.read_bytes()
+        if ENV_FILE.exists()
+        else b""
+    )
+
+
+    lines = (
+        original.decode(
+            "utf-8"
+        ).splitlines()
+        if original
+        else []
+    )
+
+
+    replace_keys = set(
+        values
+    )
+
+
+    output = []
+
+
+    for line in lines:
+
+        stripped = line.strip()
+
+
+        if (
+            "=" in stripped
+            and
+            not stripped.startswith(
+                "#"
+            )
+        ):
+
+            key = (
+                stripped
+                .split(
+                    "=",
+                    1,
+                )[0]
+                .strip()
+            )
+
+
+            if key in replace_keys:
+                continue
+
+
+        output.append(
+            line
+        )
+
+
+    for key in sorted(
+        values
+    ):
+
+        output.append(
+            f"{key}={values[key]}"
+        )
+
+
+    content = (
+        "\n".join(
+            output
+        ).rstrip()
+        +
+        "\n"
+    ).encode(
+        "utf-8"
+    )
+
+
+    fd, temp_name = (
+        tempfile.mkstemp(
+            dir=str(
+                ENV_FILE.parent
+            ),
+            prefix=".activation-env.",
+        )
+    )
+
+
+    try:
+
+        with os.fdopen(
+            fd,
+            "wb",
+        ) as handle:
+
+            handle.write(
+                content
+            )
+
+            handle.flush()
+
+            os.fsync(
+                handle.fileno()
+            )
+
+
+        os.chmod(
+            temp_name,
+            0o600,
+        )
+
+
+        os.replace(
+            temp_name,
+            ENV_FILE,
+        )
+
+
+    finally:
+
+        try:
+
+            os.unlink(
+                temp_name
+            )
+
+        except FileNotFoundError:
+            pass
+
+
+def _atomic_symlink(
+    link,
+    target,
+):
+
+    link = Path(
+        link
+    )
+
+
+    temp = (
+        link.parent
+        /
+        (
+            "."
+            +
+            link.name
+            +
+            ".activation-"
+            +
+            str(
+                os.getpid()
+            )
+        )
+    )
+
+
+    try:
+
+        temp.unlink()
+
+    except FileNotFoundError:
+        pass
+
+
+    os.symlink(
+        target,
+        temp,
+    )
+
+
+    os.replace(
+        temp,
+        link,
+    )
+
+
+def _snapshot_runtime(
+    backup_dir,
+):
+
+    backup_dir.mkdir(
+        parents=True,
+        exist_ok=False,
+    )
+
+
+    os.chmod(
+        backup_dir,
+        0o700,
+    )
+
+
+    if ENV_FILE.exists():
+
+        shutil.copy2(
+            ENV_FILE,
+            backup_dir
+            / "production.env",
+        )
+
+
+        os.chmod(
+            backup_dir
+            / "production.env",
+            0o600,
+        )
+
+
+    pointer_state = {}
+
+
+    for name, path in (
+        ACTIVE_FILES.items()
+    ):
+
+        if path.is_symlink():
+
+            pointer_state[
+                name
+            ] = {
+                "kind":
+                    "symlink",
+
+                "target":
+                    os.readlink(
+                        path
+                    ),
+            }
+
+
+        elif path.exists():
+
+            backup_name = (
+                "active-"
+                +
+                name
+            )
+
+
+            shutil.copy2(
+                path,
+                backup_dir
+                / backup_name,
+            )
+
+
+            pointer_state[
+                name
+            ] = {
+                "kind":
+                    "file",
+
+                "backup":
+                    backup_name,
+            }
+
+
+        else:
+
+            pointer_state[
+                name
+            ] = {
+                "kind":
+                    "missing",
+            }
+
+
+    (
+        backup_dir
+        / "active-files.json"
+    ).write_text(
+        json.dumps(
+            pointer_state,
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _restore_runtime(
+    backup_dir,
+):
+
+    env_backup = (
+        backup_dir
+        / "production.env"
+    )
+
+
+    if env_backup.exists():
+
+        fd, temp_name = (
+            tempfile.mkstemp(
+                dir=str(
+                    ENV_FILE.parent
+                ),
+                prefix=".rollback-env.",
+            )
+        )
+
+
+        try:
+
+            with os.fdopen(
+                fd,
+                "wb",
+            ) as handle:
+
+                handle.write(
+                    env_backup.read_bytes()
+                )
+
+                handle.flush()
+
+                os.fsync(
+                    handle.fileno()
+                )
+
+
+            os.chmod(
+                temp_name,
+                0o600,
+            )
+
+
+            os.replace(
+                temp_name,
+                ENV_FILE,
+            )
+
+
+        finally:
+
+            try:
+
+                os.unlink(
+                    temp_name
+                )
+
+            except FileNotFoundError:
+                pass
+
+
+    state = _activation_json(
+        backup_dir
+        / "active-files.json"
+    )
+
+
+    for name, item in state.items():
+
+        path = ACTIVE_FILES[
+            name
+        ]
+
+
+        kind = item.get(
+            "kind"
+        )
+
+
+        if kind == "symlink":
+
+            _atomic_symlink(
+                path,
+                item[
+                    "target"
+                ],
+            )
+
+
+        elif kind == "file":
+
+            source_file = (
+                backup_dir
+                / item[
+                    "backup"
+                ]
+            )
+
+
+            temp_file = (
+                path.parent
+                /
+                (
+                    "."
+                    +
+                    path.name
+                    +
+                    ".rollback"
+                )
+            )
+
+
+            shutil.copy2(
+                source_file,
+                temp_file,
+            )
+
+
+            os.replace(
+                temp_file,
+                path,
+            )
+
+
+        elif kind == "missing":
+
+            try:
+
+                path.unlink()
+
+            except FileNotFoundError:
+                pass
+
+
+def _deploy_revision(
+    plan,
+):
+
+    site_id = plan[
+        "site_id"
+    ]
+
+    revision_id = plan[
+        "revision_id"
+    ]
+
+
+    source = (
+        plan[
+            "revision_dir"
+        ]
+        / "artifacts"
+    )
+
+
+    parent = (
+        CALIBRATION_ROOT
+        / "sites"
+        / site_id
+        / "revisions"
+    )
+
+
+    parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+    destination = (
+        parent
+        / revision_id
+    )
+
+
+    if not destination.exists():
+
+        stage = Path(
+            tempfile.mkdtemp(
+                prefix=".activation-stage.",
+                dir=str(
+                    parent
+                ),
+            )
+        )
+
+
+        try:
+
+            for filename in (
+                "camera_intrinsics.json",
+                "distance_global.json",
+                "site.json",
+                "preset_rotation.json",
+            ):
+
+                src = (
+                    source
+                    / filename
+                )
+
+
+                dst = (
+                    stage
+                    / filename
+                )
+
+
+                shutil.copy2(
+                    src,
+                    dst,
+                    follow_symlinks=True,
+                )
+
+
+                os.chmod(
+                    dst,
+                    0o640,
+                )
+
+
+            os.replace(
+                stage,
+                destination,
+            )
+
+
+        except Exception:
+
+            shutil.rmtree(
+                stage,
+                ignore_errors=True,
+            )
+
+            raise
+
+
+    # Verify immutable deployed copies.
+    for filename in (
+        "camera_intrinsics.json",
+        "distance_global.json",
+        "site.json",
+        "preset_rotation.json",
+    ):
+
+        if (
+            _activation_sha256(
+                destination
+                / filename
+            )
+            !=
+            _activation_sha256(
+                source
+                / filename
+            )
+        ):
+
+            raise RuntimeError(
+                "deployed calibration hash mismatch: "
+                +
+                filename
+            )
+
+
+    relative_root = (
+        destination.relative_to(
+            CALIBRATION_ROOT
+        )
+    )
+
+
+    _atomic_symlink(
+        ACTIVE_FILES[
+            "camera_intrinsics.json"
+        ],
+        str(
+            relative_root
+            / "camera_intrinsics.json"
+        ),
+    )
+
+
+    _atomic_symlink(
+        ACTIVE_FILES[
+            "distance_global.json"
+        ],
+        str(
+            relative_root
+            / "distance_global.json"
+        ),
+    )
+
+
+    _atomic_symlink(
+        ACTIVE_FILES[
+            "site.json"
+        ],
+        str(
+            relative_root
+            / "site.json"
+        ),
+    )
+
+
+    _atomic_symlink(
+        ACTIVE_FILES[
+            "preset_rotation.json"
+        ],
+        str(
+            relative_root
+            / "preset_rotation.json"
+        ),
+    )
+
+
+    return destination
+
+
+def _activation_tool(
+    command,
+    *,
+    timeout,
+):
+
+    fire = pwd.getpwnam(
+        "fire"
+    )
+
+
+    env = os.environ.copy()
+
+    env.update(
+        load_env()
+    )
+
+
+    process = subprocess.run(
+        command,
+
+        cwd=str(
+            PROJECT_ROOT
+        ),
+
+        env=env,
+
+        capture_output=True,
+        text=True,
+
+        timeout=timeout,
+
+        check=False,
+
+        user=fire.pw_uid,
+        group=fire.pw_gid,
+    )
+
+
+    return {
+        "ok":
+            process.returncode == 0,
+
+        "return_code":
+            int(
+                process.returncode
+            ),
+
+        "stdout":
+            (
+                process.stdout
+                or ""
+            )[-20000:],
+
+        "stderr":
+            (
+                process.stderr
+                or ""
+            )[-10000:],
+    }
+
+
+def _detection_stable(
+    seconds=8,
+):
+
+    deadline = (
+        time.monotonic()
+        +
+        float(
+            seconds
+        )
+    )
+
+
+    while (
+        time.monotonic()
+        <
+        deadline
+    ):
+
+        if not detection_active():
+
+            return False
+
+
+        time.sleep(
+            1.0
+        )
+
+
+    return detection_active()
+
+
+def _write_activation_record(
+    plan,
+    payload,
+):
+
+    directory = (
+        ACTIVATION_RECORD_ROOT
+        / plan[
+            "site_id"
+        ]
+    )
+
+
+    directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+    filename = (
+        plan[
+            "revision_id"
+        ]
+        +
+        ".json"
+    )
+
+
+    path = (
+        directory
+        / filename
+    )
+
+
+    path.write_text(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+        )
+        +
+        "\n",
+        encoding="utf-8",
+    )
+
+
+    os.chmod(
+        path,
+        0o640,
+    )
+
+
+    latest = (
+        directory
+        / "latest.json"
+    )
+
+
+    temp = (
+        directory
+        / ".latest.json.tmp"
+    )
+
+
+    temp.write_text(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+        )
+        +
+        "\n",
+        encoding="utf-8",
+    )
+
+
+    os.chmod(
+        temp,
+        0o640,
+    )
+
+
+    os.replace(
+        temp,
+        latest,
+    )
+
+
+def activate_revision_transaction(
+    site_id,
+    revision_id,
+):
+
+    try:
+
+        plan = (
+            _validate_activation_revision(
+                site_id,
+                revision_id,
+            )
+        )
+
+
+    except Exception as exc:
+
+        return response(
+            False,
+
+            error=(
+                f"{type(exc).__name__}: "
+                f"{exc}"
+            ),
+
+            runtime_changed=False,
+
+            rollback=False,
+        )
+
+
+    ACTIVATION_BACKUP_ROOT.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    ACTIVATION_RECORD_ROOT.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    ACTIVATION_LOCK.touch(
+        exist_ok=True
+    )
+
+    HARDWARE_LOCK.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    HARDWARE_LOCK.touch(
+        exist_ok=True
+    )
+
+
+    with ACTIVATION_LOCK.open(
+        "r+"
+    ) as activation_lock:
+
+        fcntl.flock(
+            activation_lock,
+            fcntl.LOCK_EX,
+        )
+
+
+        with HARDWARE_LOCK.open(
+            "r+"
+        ) as hardware_lock:
+
+            fcntl.flock(
+                hardware_lock,
+                fcntl.LOCK_EX,
+            )
+
+
+            stamp = (
+                datetime.now(
+                    timezone.utc
+                )
+                .strftime(
+                    "%Y%m%dT%H%M%SZ"
+                )
+            )
+
+
+            backup_dir = (
+                ACTIVATION_BACKUP_ROOT
+                /
+                (
+                    stamp
+                    +
+                    "-"
+                    +
+                    plan[
+                        "site_id"
+                    ]
+                    +
+                    "-"
+                    +
+                    plan[
+                        "revision_id"
+                    ]
+                )
+            )
+
+
+            was_active = (
+                detection_active()
+            )
+
+
+            was_enabled = (
+                detection_enabled()
+            )
+
+
+            _snapshot_runtime(
+                backup_dir
+            )
+
+
+            preflight = None
+            full_sweep = None
+            deployment = None
+
+
+            try:
+
+                # Freeze runtime before any pointer/env swap.
+                if was_active:
+
+                    stop_ok, stop_detail = (
+                        _service_action(
+                            "stop"
+                        )
+                    )
+
+
+                    if not stop_ok:
+
+                        raise RuntimeError(
+                            "cannot_stop_detection: "
+                            +
+                            str(
+                                stop_detail
+                            )
+                        )
+
+
+                deployment = (
+                    _deploy_revision(
+                        plan
+                    )
+                )
+
+
+                _atomic_env_merge(
+                    plan[
+                        "environment"
+                    ]
+                )
+
+
+                preflight = (
+                    _activation_tool(
+                        [
+                            PROJECT_PYTHON,
+                            str(
+                                PROJECT_ROOT
+                                / "preflight.py"
+                            ),
+                            "--offline",
+                        ],
+                        timeout=120,
+                    )
+                )
+
+
+                if (
+                    plan[
+                        "mode"
+                    ]
+                    ==
+                    "PRODUCTION"
+                    and
+                    not preflight[
+                        "ok"
+                    ]
+                ):
+
+                    raise RuntimeError(
+                        "production_preflight_failed"
+                    )
+
+
+                if (
+                    plan[
+                        "mode"
+                    ]
+                    ==
+                    "PRODUCTION"
+                ):
+
+                    full_sweep = (
+                        _activation_tool(
+                            [
+                                PROJECT_PYTHON,
+                                str(
+                                    PROJECT_ROOT
+                                    / "test_full_sweep.py"
+                                ),
+                                "--cycles",
+                                "1",
+                            ],
+                            timeout=300,
+                        )
+                    )
+
+
+                    if not full_sweep[
+                        "ok"
+                    ]:
+
+                        raise RuntimeError(
+                            "production_full_sweep_failed"
+                        )
+
+
+                restart_ok, restart_detail = (
+                    restart_detection()
+                )
+
+
+                if not restart_ok:
+
+                    raise RuntimeError(
+                        "detection_restart_failed: "
+                        +
+                        str(
+                            restart_detail
+                        )
+                    )
+
+
+                if not _detection_stable(
+                    8
+                ):
+
+                    raise RuntimeError(
+                        "detection_health_unstable"
+                    )
+
+
+                enable_ok, enable_detail = (
+                    _service_action(
+                        "enable"
+                    )
+                )
+
+
+                if not enable_ok:
+
+                    raise RuntimeError(
+                        "cannot_enable_detection: "
+                        +
+                        str(
+                            enable_detail
+                        )
+                    )
+
+
+                activated_at = (
+                    datetime.now(
+                        timezone.utc
+                    ).isoformat()
+                )
+
+
+                record = {
+                    "ok":
+                        True,
+
+                    "status":
+                        "ACTIVE",
+
+                    "site_id":
+                        plan[
+                            "site_id"
+                        ],
+
+                    "revision_id":
+                        plan[
+                            "revision_id"
+                        ],
+
+                    "mode":
+                        plan[
+                            "mode"
+                        ],
+
+                    "candidate_digest":
+                        plan[
+                            "revision"
+                        ].get(
+                            "candidate_digest"
+                        ),
+
+                    "activated_at":
+                        activated_at,
+
+                    "deployment":
+                        str(
+                            deployment
+                        ),
+
+                    "backup":
+                        str(
+                            backup_dir
+                        ),
+
+                    "preflight_ok":
+                        bool(
+                            preflight
+                            and
+                            preflight[
+                                "ok"
+                            ]
+                        ),
+
+                    "full_sweep_ok":
+                        (
+                            None
+                            if full_sweep
+                            is None
+                            else bool(
+                                full_sweep[
+                                    "ok"
+                                ]
+                            )
+                        ),
+
+                    "detection":
+                        "active",
+
+                    "rollback":
+                        False,
+                }
+
+
+                _write_activation_record(
+                    plan,
+                    record,
+                )
+
+
+                return response(
+                    True,
+
+                    status=
+                        "ACTIVE",
+
+                    site_id=
+                        plan[
+                            "site_id"
+                        ],
+
+                    revision_id=
+                        plan[
+                            "revision_id"
+                        ],
+
+                    mode=
+                        plan[
+                            "mode"
+                        ],
+
+                    activated_at=
+                        activated_at,
+
+                    preflight=
+                        preflight,
+
+                    full_sweep=
+                        full_sweep,
+
+                    detection=
+                        "active",
+
+                    rollback=
+                        False,
+
+                    runtime_changed=
+                        True,
+                )
+
+
+            except Exception as exc:
+
+                rollback_error = None
+
+
+                try:
+
+                    _restore_runtime(
+                        backup_dir
+                    )
+
+
+                except Exception as restore_exc:
+
+                    rollback_error = (
+                        f"{type(restore_exc).__name__}: "
+                        f"{restore_exc}"
+                    )
+
+
+                rollback_ok = False
+                rollback_status = None
+
+
+                if rollback_error is None:
+
+                    if was_active:
+
+                        rollback_ok, rollback_status = (
+                            restart_detection()
+                        )
+
+
+                        if rollback_ok:
+
+                            rollback_ok = (
+                                _detection_stable(
+                                    5
+                                )
+                            )
+
+
+                    else:
+
+                        stop_ok, stop_detail = (
+                            _service_action(
+                                "stop"
+                            )
+                        )
+
+
+                        rollback_ok = (
+                            stop_ok
+                            and
+                            not detection_active()
+                        )
+
+
+                        rollback_status = (
+                            stop_detail
+                        )
+
+
+                    if was_enabled:
+
+                        state_ok, state_detail = (
+                            _service_action(
+                                "enable"
+                            )
+                        )
+
+
+                    else:
+
+                        state_ok, state_detail = (
+                            _service_action(
+                                "disable"
+                            )
+                        )
+
+
+                    rollback_ok = (
+                        rollback_ok
+                        and
+                        state_ok
+                    )
+
+
+                    rollback_status = {
+                        "runtime":
+                            rollback_status,
+
+                        "boot_state":
+                            state_detail,
+
+                        "was_active":
+                            bool(
+                                was_active
+                            ),
+
+                        "was_enabled":
+                            bool(
+                                was_enabled
+                            ),
+                    }
+
+
+                failure = {
+                    "ok":
+                        False,
+
+                    "status":
+                        "ROLLED_BACK"
+                        if rollback_ok
+                        else
+                        "ROLLBACK_FAILED",
+
+                    "site_id":
+                        plan[
+                            "site_id"
+                        ],
+
+                    "revision_id":
+                        plan[
+                            "revision_id"
+                        ],
+
+                    "mode":
+                        plan[
+                            "mode"
+                        ],
+
+                    "failed_at":
+                        datetime.now(
+                            timezone.utc
+                        ).isoformat(),
+
+                    "error":
+                        (
+                            f"{type(exc).__name__}: "
+                            f"{exc}"
+                        ),
+
+                    "rollback":
+                        True,
+
+                    "rollback_ok":
+                        bool(
+                            rollback_ok
+                        ),
+
+                    "rollback_status":
+                        rollback_status,
+
+                    "rollback_error":
+                        rollback_error,
+
+                    "backup":
+                        str(
+                            backup_dir
+                        ),
+                }
+
+
+                try:
+
+                    _write_activation_record(
+                        plan,
+                        failure,
+                    )
+
+                except Exception:
+                    pass
+
+
+                return response(
+                    False,
+
+                    error=
+                        failure[
+                            "error"
+                        ],
+
+                    rollback=True,
+
+                    rollback_ok=
+                        bool(
+                            rollback_ok
+                        ),
+
+                    rollback_status=
+                        rollback_status,
+
+                    rollback_error=
+                        rollback_error,
+
+                    preflight=
+                        preflight,
+
+                    full_sweep=
+                        full_sweep,
+
+                    runtime_changed=
+                        (
+                            not rollback_ok
+                        ),
+                )
+
+
+            finally:
+
+                fcntl.flock(
+                    hardware_lock,
+                    fcntl.LOCK_UN,
+                )
+
+
+        fcntl.flock(
+            activation_lock,
+            fcntl.LOCK_UN,
+        )
+
+
+def handle(
+    request,
+):
+
+    action = request.get(
+        "action"
+    )
+
+
+    if action == "activate_revision":
+
+        return activate_revision_transaction(
+            request.get(
+                "site_id"
+            ),
+            request.get(
+                "revision_id"
+            ),
+        )
+
+
+    if action == "settings_read":
+
+        return public_settings()
+
+
+    if action in {
+        "settings_write",
+        "settings_apply",
+    }:
+
+        values = (
+            validate_payload(
+                request.get(
+                    "settings",
+                    {},
+                )
+            )
+        )
+
+
+        original, backup = (
+            atomic_write(
+                values
+            )
+        )
+
+
+        if action == (
+            "settings_write"
+        ):
+
+            return response(
+                True,
+                saved=values,
+                backup=str(
+                    backup
+                ),
+                restart_required=True,
+            )
+
+
+        ok, status = (
+            restart_detection()
+        )
+
+
+        if ok:
+
+            return response(
+                True,
+                saved=values,
+                backup=str(
+                    backup
+                ),
+                detection=status,
+                rollback=False,
+            )
+
+
+        # automatic rollback
+        ENV_FILE.write_bytes(
+            original
+        )
+
+        os.chmod(
+            ENV_FILE,
+            0o600,
+        )
+
+
+        rollback_ok, rollback_status = (
+            restart_detection()
+        )
+
+
+        return response(
+            False,
+            error="apply_failed",
+            apply_error=status,
+            rollback=True,
+            rollback_restart=(
+                rollback_ok
+            ),
+            rollback_status=(
+                rollback_status
+            ),
+            backup=str(
+                backup
+            ),
+        )
+
+
+    if action == (
+        "restart_detection"
+    ):
+
+        ok, status = (
+            restart_detection()
+        )
+
+        return response(
+            ok,
+            detection=(
+                "active"
+                if ok
+                else None
+            ),
+            error=(
+                None
+                if ok
+                else status
+            ),
+        )
+
+
+    if action == "detection_status":
+
+        return response(
+            True,
+            active=detection_active(),
+        )
+
+
+    if action in {
+        "stop_detection",
+        "start_detection",
+    }:
+
+        verb = (
+            "stop"
+            if action == "stop_detection"
+            else "start"
+        )
+
+        process = subprocess.run(
+            [
+                "/usr/bin/systemctl",
+                verb,
+                DETECTION_SERVICE,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+
+        if process.returncode != 0:
+
+            return response(
+                False,
+                error=(
+                    process.stderr.strip()
+                    or
+                    process.stdout.strip()
+                    or
+                    f"{verb} failed"
+                ),
+            )
+
+        active = detection_active()
+
+        expected = (
+            False
+            if verb == "stop"
+            else True
+        )
+
+        return response(
+            active == expected,
+            active=active,
+            action=verb,
+        )
+
+
+    if action == "run_existing_tool":
+
+        return run_existing_tool(
+            request.get(
+                "tool_id"
+            )
+        )
+
+
+    return response(
+        False,
+        error=(
+            "operation_not_allowed"
+        ),
+    )
+
+
+def serve():
+
+    SOCKET_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+    try:
+        SOCKET_PATH.unlink()
+
+    except FileNotFoundError:
+        pass
+
+
+    server = socket.socket(
+        socket.AF_UNIX,
+        socket.SOCK_STREAM,
+    )
+
+
+    server.bind(
+        str(
+            SOCKET_PATH
+        )
+    )
+
+
+    fire_gid = (
+        grp.getgrnam(
+            "fire"
+        ).gr_gid
+    )
+
+
+    os.chown(
+        SOCKET_PATH,
+        0,
+        fire_gid,
+    )
+
+    os.chmod(
+        SOCKET_PATH,
+        0o660,
+    )
+
+
+    server.listen(
+        8
+    )
+
+
+    while True:
+
+        client, _ = (
+            server.accept()
+        )
+
+
+        with client:
+
+            try:
+
+                authorize_peer(
+                    client
+                )
+
+
+                raw = b""
+
+                while (
+                    b"\n" not in raw
+                    and len(raw)
+                    < 65536
+                ):
+
+                    part = (
+                        client.recv(
+                            4096
+                        )
+                    )
+
+                    if not part:
+                        break
+
+                    raw += part
+
+
+                if len(raw) >= 65536:
+
+                    result = response(
+                        False,
+                        error=(
+                            "request_too_large"
+                        ),
+                    )
+
+                else:
+
+                    request = json.loads(
+                        raw.decode(
+                            "utf-8"
+                        )
+                    )
+
+                    result = handle(
+                        request
+                    )
+
+
+            except Exception as exc:
+
+                result = response(
+                    False,
+                    error=(
+                        f"{type(exc).__name__}: "
+                        f"{exc}"
+                    ),
+                )
+
+
+            client.sendall(
+                (
+                    json.dumps(
+                        result,
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                ).encode(
+                    "utf-8"
+                )
+            )
+
+
+if __name__ == "__main__":
+    serve()

@@ -4,6 +4,11 @@ import json
 import socket
 
 
+from manager.services.hardware_lock import (
+    hardware_lock,
+)
+
+
 SOCKET_PATH = (
     "/run/"
     "smart-fire-manager-agent/"
@@ -98,13 +103,45 @@ def run_existing_tool(
     tool_id,
 ):
 
+    with hardware_lock(
+        (
+            "ops:"
+            +
+            str(
+                tool_id
+            )
+        ),
+        timeout=1.0,
+    ):
+
+        return agent_request(
+            {
+                "action":
+                    "run_existing_tool",
+
+                "tool_id":
+                    tool_id,
+            },
+            timeout=360,
+        )
+
+
+def activate_revision(
+    site_id,
+    revision_id,
+):
+
     return agent_request(
         {
             "action":
-                "run_existing_tool",
+                "activate_revision",
 
-            "tool_id":
-                tool_id,
+            "site_id":
+                site_id,
+
+            "revision_id":
+                revision_id,
         },
-        timeout=360,
+
+        timeout=480,
     )

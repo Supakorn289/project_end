@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import shutil
 import time
 from pathlib import Path
@@ -33,29 +34,68 @@ PATTERN_SIZE = (
     PATTERN_ROWS,
 )
 
-WORK_DIR = (
+def _env_path(
+    name,
+    default,
+):
+
+    value = (
+        os.getenv(
+            name,
+            ""
+        )
+        .strip()
+    )
+
+
+    if value:
+
+        return (
+            Path(
+                value
+            )
+            .expanduser()
+            .resolve()
+        )
+
+
+    return Path(
+        default
+    )
+
+
+WORK_DIR = _env_path(
+    "SMART_FIRE_INTRINSICS_WORK_DIR",
     CALIBRATION_DIR
-    / "intrinsics_v1"
+    / "intrinsics_v1",
 )
 
-CAPTURE_DIR = (
+
+CAPTURE_DIR = _env_path(
+    "SMART_FIRE_INTRINSICS_CAPTURE_DIR",
     WORK_DIR
-    / "captures"
+    / "captures",
 )
 
-CHECKERBOARD_FILE = (
+
+CHECKERBOARD_FILE = _env_path(
+    "SMART_FIRE_INTRINSICS_CHECKERBOARD_FILE",
     WORK_DIR
-    / "checkerboard_9x6.png"
+    / "checkerboard_9x6.png",
 )
 
-OUTPUT_FILE = (
+
+OUTPUT_FILE = _env_path(
+    "SMART_FIRE_INTRINSICS_OUTPUT_FILE",
     CALIBRATION_DIR
-    / "camera_intrinsics.json"
+    / "camera_intrinsics.json",
 )
 
-REPORT_FILE = (
+
+REPORT_FILE = _env_path(
+    "SMART_FIRE_INTRINSICS_REPORT_FILE",
     WORK_DIR
-    / "fit_report.json"
+    / "fit_report.json",
 )
 
 

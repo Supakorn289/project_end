@@ -417,10 +417,113 @@ def adopt_current_site(
     )
 
 
+def _site_location(
+    *,
+    installation_location=None,
+    latitude=None,
+    longitude=None,
+):
+
+    label = str(
+        installation_location
+        or ""
+    ).strip()
+
+
+    if (
+        latitude in {
+            None,
+            "",
+        }
+        and
+        longitude in {
+            None,
+            "",
+        }
+    ):
+
+        return {
+            "installation_location":
+                label or None,
+
+            "latitude":
+                None,
+
+            "longitude":
+                None,
+        }
+
+
+    if (
+        latitude in {
+            None,
+            "",
+        }
+        or
+        longitude in {
+            None,
+            "",
+        }
+    ):
+
+        raise ValueError(
+            "Latitude และ Longitude "
+            "ต้องกรอกให้ครบทั้งคู่"
+        )
+
+
+    latitude = float(
+        latitude
+    )
+
+    longitude = float(
+        longitude
+    )
+
+
+    if not (
+        -90.0
+        <= latitude
+        <= 90.0
+    ):
+
+        raise ValueError(
+            "Latitude ต้องอยู่ "
+            "ระหว่าง -90 ถึง 90"
+        )
+
+
+    if not (
+        -180.0
+        <= longitude
+        <= 180.0
+    ):
+
+        raise ValueError(
+            "Longitude ต้องอยู่ "
+            "ระหว่าง -180 ถึง 180"
+        )
+
+
+    return {
+        "installation_location":
+            label or None,
+
+        "latitude":
+            latitude,
+
+        "longitude":
+            longitude,
+    }
+
+
 def create_site(
     site_id: str,
     mode: str,
     display_name: str | None = None,
+    installation_location=None,
+    latitude=None,
+    longitude=None,
 ) -> dict:
 
     site_id = _validate_site_id(
@@ -430,6 +533,41 @@ def create_site(
     mode = _validate_mode(
         mode
     )
+
+
+    location = _site_location(
+        installation_location=
+            installation_location,
+
+        latitude=
+            latitude,
+
+        longitude=
+            longitude,
+    )
+
+
+    if (
+        mode == "PRODUCTION"
+        and
+        (
+            location[
+                "latitude"
+            ]
+            is None
+            or
+            location[
+                "longitude"
+            ]
+            is None
+        )
+    ):
+
+        raise ValueError(
+            "PRODUCTION ต้องกำหนด "
+            "Latitude / Longitude"
+        )
+
 
     def mutate(registry: dict):
 
@@ -449,6 +587,9 @@ def create_site(
             ),
 
             "mode": mode,
+
+            "location":
+                location,
 
             "lifecycle": "DRAFT",
 
@@ -676,3 +817,89 @@ def preview_invalidation(
         "write_performed":
             False,
     }
+
+
+def set_site_location(
+    site_id: str,
+    *,
+    installation_location=None,
+    latitude=None,
+    longitude=None,
+) -> dict:
+
+    site_id = _validate_site_id(
+        site_id
+    )
+
+    location = _site_location(
+        installation_location=
+            installation_location,
+
+        latitude=
+            latitude,
+
+        longitude=
+            longitude,
+    )
+
+
+    def mutate(registry: dict):
+
+        sites = registry[
+            "sites"
+        ]
+
+
+        if site_id not in sites:
+
+            raise KeyError(
+                "site not registered"
+            )
+
+
+        site = sites[
+            site_id
+        ]
+
+
+        if (
+            site.get(
+                "mode"
+            )
+            == "PRODUCTION"
+            and
+            (
+                location[
+                    "latitude"
+                ]
+                is None
+                or
+                location[
+                    "longitude"
+                ]
+                is None
+            )
+        ):
+
+            raise ValueError(
+                "PRODUCTION ต้องกำหนด "
+                "Latitude / Longitude"
+            )
+
+
+        site[
+            "location"
+        ] = location
+
+
+        site[
+            "updated_at"
+        ] = _now()
+
+
+        return site
+
+
+    return _with_registry(
+        mutate
+    )

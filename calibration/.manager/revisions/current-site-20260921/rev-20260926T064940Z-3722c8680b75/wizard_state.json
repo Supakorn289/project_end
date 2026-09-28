@@ -1,0 +1,40 @@
+{
+  "calibration_mode": true,
+  "captures": {
+    "holdout": {},
+    "main": {
+      "1": {
+        "age_sec": 0.0118,
+        "capture_set": "main",
+        "height": 720,
+        "ok": true,
+        "preset": 1,
+        "relative_url": "/api/wizard/current-site-20260921/capture-image/main/preset_1.jpg",
+        "seq": 160,
+        "width": 1280
+      }
+    }
+  },
+  "created_at": "2026-09-24T06:59:44.748681+00:00",
+  "distance": {
+    "candidate": null,
+    "points": [],
+    "verifications": []
+  },
+  "geometry": {
+    "candidate": null,
+    "holdout": {},
+    "train": {
+      "1-2": []
+    }
+  },
+  "mode": "LAB",
+  "north": {
+    "candidate": null,
+    "references": []
+  },
+  "schema_version": 1,
+  "site_id": "current-site-20260921",
+  "step": "PTZ_CAPTURE",
+  "updated_at": "2026-09-24T07:47:30.423739+00:00"
+}

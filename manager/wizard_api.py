@@ -12,15 +12,33 @@ from flask import (
     jsonify,
     render_template,
     request,
+    send_file,
 )
 
 from manager.security import (
     require_manager_session,
 )
 
+from manager.services.calibration_lease import (
+    CalibrationLeaseBusy,
+    CalibrationLeaseExpired,
+    CalibrationLeaseMissing,
+    create_lease,
+    read_lease,
+    release_lease,
+    renew_lease,
+)
+
+
 from manager.services.calibration_worker_client import (
     capture_preset,
     worker_health,
+)
+
+
+from manager.services.calibration_adapter import (
+    build_distance_candidate,
+    verify_distance_candidate,
 )
 
 from manager.services.runtime_settings import (
@@ -32,6 +50,7 @@ from manager.services.runtime_settings import (
 from manager.services.site_registry import (
     create_site,
     list_registered_sites,
+    set_site_location,
 )
 
 from manager.services.wizard_store import (
@@ -164,6 +183,21 @@ def wizard_new_site():
             display_name=data.get(
                 "display_name"
             ),
+
+            installation_location=
+                data.get(
+                    "installation_location"
+                ),
+
+            latitude=
+                data.get(
+                    "latitude"
+                ),
+
+            longitude=
+                data.get(
+                    "longitude"
+                ),
         )
 
 
@@ -218,11 +252,44 @@ def wizard_calibration_start(
     site_id,
 ):
 
+    try:
+
+        lease = create_lease(
+            site_id
+        )
+
+
+    except (
+        CalibrationLeaseBusy,
+        CalibrationLeaseExpired,
+    ) as exc:
+
+        return jsonify({
+            "ok":
+                False,
+
+            "error":
+                str(
+                    exc
+                ),
+
+            "lease":
+                read_lease(),
+        }), 409
+
+
     stopped = stop_detection()
+
 
     if not stopped.get(
         "ok"
     ):
+
+        release_lease(
+            site_id,
+            force=True,
+        )
+
 
         return jsonify(
             stopped
@@ -231,11 +298,18 @@ def wizard_calibration_start(
 
     worker = worker_health()
 
+
     if not worker.get(
         "ok"
     ):
 
         start_detection()
+
+        release_lease(
+            site_id,
+            force=True,
+        )
+
 
         return jsonify(
             worker
@@ -246,6 +320,7 @@ def wizard_calibration_start(
         site_id
     )
 
+
     state[
         "calibration_mode"
     ] = True
@@ -253,6 +328,21 @@ def wizard_calibration_start(
     state[
         "step"
     ] = "PTZ_CAPTURE"
+
+    state[
+        "calibration_lease"
+    ] = {
+        "expires_at":
+            lease[
+                "expires_at"
+            ],
+
+        "ttl_sec":
+            lease[
+                "ttl_sec"
+            ],
+    }
+
 
     save_state(
         site_id,
@@ -262,10 +352,131 @@ def wizard_calibration_start(
 
     return ok(
         state=state,
+
         detection=(
             detection_status()
         ),
+
         worker=worker,
+
+        lease=lease,
+    )
+
+
+@wizard_bp.post(
+    "/api/wizard/<site_id>/calibration/heartbeat"
+)
+@require_manager_session
+def wizard_calibration_heartbeat(
+    site_id,
+):
+
+    state = load_state(
+        site_id
+    )
+
+
+    if (
+        state.get(
+            "calibration_mode"
+        )
+        is not True
+    ):
+
+        return jsonify({
+            "ok":
+                False,
+
+            "error":
+                "calibration_mode_not_active",
+        }), 409
+
+
+    try:
+
+        lease = renew_lease(
+            site_id
+        )
+
+
+    except (
+        CalibrationLeaseBusy,
+        CalibrationLeaseExpired,
+        CalibrationLeaseMissing,
+    ) as exc:
+
+        return jsonify({
+            "ok":
+                False,
+
+            "error":
+                str(
+                    exc
+                ),
+
+            "lease":
+                read_lease(),
+        }), 409
+
+
+    state[
+        "calibration_lease"
+    ] = {
+        "expires_at":
+            lease[
+                "expires_at"
+            ],
+
+        "ttl_sec":
+            lease[
+                "ttl_sec"
+            ],
+    }
+
+
+    save_state(
+        site_id,
+        state,
+    )
+
+
+    return ok(
+        lease=lease
+    )
+
+
+@wizard_bp.get(
+    "/api/wizard/<site_id>/calibration/lease"
+)
+@require_manager_session
+def wizard_calibration_lease(
+    site_id,
+):
+
+    lease = read_lease()
+
+
+    if (
+        lease
+        and
+        lease.get(
+            "site_id"
+        )
+        != site_id
+    ):
+
+        return ok(
+            active=False,
+            lease=None,
+        )
+
+
+    return ok(
+        active=bool(
+            lease
+        ),
+
+        lease=lease,
     )
 
 
@@ -279,13 +490,39 @@ def wizard_calibration_finish(
 
     started = start_detection()
 
+
     state = load_state(
         site_id
     )
 
-    state[
-        "calibration_mode"
-    ] = False
+
+    if started.get(
+        "ok"
+    ):
+
+        state[
+            "calibration_mode"
+        ] = False
+
+        state.pop(
+            "calibration_lease",
+            None,
+        )
+
+
+        release_lease(
+            site_id,
+            force=True,
+        )
+
+
+    else:
+
+        # Keep state/lease alive for watchdog recovery.
+        state[
+            "calibration_finish_error"
+        ] = started
+
 
     save_state(
         site_id,
@@ -293,9 +530,15 @@ def wizard_calibration_finish(
     )
 
 
-    return jsonify(
-        started
-    ), (
+    return jsonify({
+        **started,
+
+        "state":
+            state,
+
+        "lease":
+            read_lease(),
+    }), (
         200
         if started.get(
             "ok"
@@ -382,232 +625,94 @@ def wizard_distance_fit(
     )
 
 
-    if len(points) < 3:
+    try:
 
-        return jsonify({
-            "ok": False,
-            "error":
-                "ต้องมีอย่างน้อย 3 จุด",
-        }), 400
+        # ====================================================
+        # EXISTING PROJECT ENGINE
+        # calibration.fit_distance_model()
+        # ====================================================
 
+        candidate = (
+            build_distance_candidate(
+                points,
 
-    distances = np.asarray(
-        [
-            float(
-                p[
-                    "distance_m"
-                ]
-            )
-            for p in points
-        ],
-        dtype=np.float64,
-    )
+                preset=data.get(
+                    "preset"
+                ),
 
-    y_pixels = np.asarray(
-        [
-            float(
-                p[
-                    "y_px"
-                ]
-            )
-            for p in points
-        ],
-        dtype=np.float64,
-    )
-
-
-    if np.any(
-        distances <= 0
-    ):
-
-        return jsonify({
-            "ok": False,
-            "error":
-                "distance ต้องมากกว่า 0",
-        }), 400
-
-
-    x = (
-        1.0
-        /
-        distances
-    )
-
-
-    matrix = np.column_stack(
-        [
-            np.ones_like(
-                x
-            ),
-            x,
-        ]
-    )
-
-
-    params, _, _, _ = (
-        np.linalg.lstsq(
-            matrix,
-            y_pixels,
-            rcond=None,
-        )
-    )
-
-
-    H = float(
-        params[0]
-    )
-
-    K = float(
-        params[1]
-    )
-
-
-    predicted_y = (
-        H
-        +
-        K
-        /
-        distances
-    )
-
-
-    residual = (
-        y_pixels
-        -
-        predicted_y
-    )
-
-
-    rmse = float(
-        np.sqrt(
-            np.mean(
-                residual
-                ** 2
+                site_id=
+                    site_id,
             )
         )
-    )
 
 
-    state = load_state(
-        site_id
-    )
-
-
-    first_capture = None
-
-    for item in (
-        state
-        .get(
-            "captures",
-            {}
-        )
-        .get(
-            "main",
-            {}
-        )
-        .values()
-    ):
-
-        first_capture = item
-        break
-
-
-    frame_width = int(
-        (
-            first_capture
-            or {}
-        ).get(
-            "width",
-            1280,
-        )
-    )
-
-    frame_height = int(
-        (
-            first_capture
-            or {}
-        ).get(
-            "height",
-            720,
-        )
-    )
-
-
-    candidate = {
-        "version": 3,
-        "H": H,
-        "K": K,
-        "pixel_rmse": rmse,
-        "frame_width":
-            frame_width,
-        "frame_height":
-            frame_height,
-        "points":
-            len(points),
-        "min_distance_m":
-            float(
-                distances.min()
-            ),
-        "max_distance_m":
-            float(
-                distances.max()
-            ),
-        "samples": [
-            {
-                "distance_m":
-                    float(d),
-                "y_px":
-                    float(y),
-            }
-            for d, y
-            in zip(
-                distances,
-                y_pixels,
+        candidate_file = (
+            save_candidate(
+                site_id,
+                "distance_global.json",
+                candidate,
             )
-        ],
-        "status":
-            "CANDIDATE",
-    }
+        )
 
 
-    candidate_file = (
-        save_candidate(
+        state = load_state(
+            site_id
+        )
+
+
+        state[
+            "distance"
+        ][
+            "points"
+        ] = points
+
+
+        state[
+            "distance"
+        ][
+            "candidate"
+        ] = candidate
+
+
+        state[
+            "step"
+        ] = "DISTANCE_VERIFY"
+
+
+        save_state(
             site_id,
-            "distance_global.json",
-            candidate,
+            state,
         )
-    )
 
 
-    state[
-        "distance"
-    ][
-        "points"
-    ] = points
+        return ok(
+            engine=(
+                "calibration."
+                "fit_distance_model"
+            ),
 
-    state[
-        "distance"
-    ][
-        "candidate"
-    ] = candidate
+            candidate=
+                candidate,
 
-    state[
-        "step"
-    ] = "DISTANCE_VERIFY"
+            candidate_file=str(
+                candidate_file
+            ),
 
-
-    save_state(
-        site_id,
-        state,
-    )
+            runtime_changed=
+                False,
+        )
 
 
-    return ok(
-        candidate=candidate,
-        candidate_file=str(
-            candidate_file
-        ),
-    )
+    except Exception as exc:
+
+        return jsonify({
+            "ok": False,
+
+            "error": (
+                f"{type(exc).__name__}: "
+                f"{exc}"
+            ),
+        }), 400
 
 
 @wizard_bp.post(
@@ -620,141 +725,89 @@ def wizard_distance_verify(
 
     data = payload()
 
-    state = load_state(
-        site_id
-    )
 
-    candidate = (
+    try:
+
+        state = load_state(
+            site_id
+        )
+
+
+        candidate = (
+            state[
+                "distance"
+            ][
+                "candidate"
+            ]
+        )
+
+
+        if not candidate:
+
+            raise ValueError(
+                "ยังไม่มี distance candidate"
+            )
+
+
+        # ====================================================
+        # EXISTING PROJECT ENGINE
+        # calibration.DistanceModel.estimate()
+        # ====================================================
+
+        verification = (
+            verify_distance_candidate(
+                candidate,
+
+                y_px=data[
+                    "y_px"
+                ],
+
+                actual_distance_m=data[
+                    "actual_distance_m"
+                ],
+            )
+        )
+
+
         state[
             "distance"
         ][
-            "candidate"
-        ]
-    )
+            "verifications"
+        ].append(
+            verification
+        )
 
 
-    if not candidate:
+        save_state(
+            site_id,
+            state,
+        )
+
+
+        return ok(
+            engine=(
+                "calibration."
+                "DistanceModel.estimate"
+            ),
+
+            verification=
+                verification,
+
+            runtime_changed=
+                False,
+        )
+
+
+    except Exception as exc:
 
         return jsonify({
             "ok": False,
-            "error":
-                "ยังไม่มี distance candidate",
+
+            "error": (
+                f"{type(exc).__name__}: "
+                f"{exc}"
+            ),
         }), 400
-
-
-    y_px = float(
-        data[
-            "y_px"
-        ]
-    )
-
-    actual = float(
-        data[
-            "actual_distance_m"
-        ]
-    )
-
-
-    denominator = (
-        y_px
-        -
-        float(
-            candidate[
-                "H"
-            ]
-        )
-    )
-
-
-    if denominator <= 0:
-
-        return jsonify({
-            "ok": False,
-            "error":
-                "Y อยู่นอกช่วง model",
-        }), 400
-
-
-    predicted = (
-        float(
-            candidate[
-                "K"
-            ]
-        )
-        /
-        denominator
-    )
-
-
-    signed_error = (
-        predicted
-        -
-        actual
-    )
-
-    abs_error = abs(
-        signed_error
-    )
-
-    percent = (
-        abs_error
-        /
-        actual
-        * 100.0
-    )
-
-
-    if percent <= 5.0:
-
-        grade = "EXCELLENT"
-
-    elif percent <= 10.0:
-
-        grade = "GOOD"
-
-    elif percent <= 15.0:
-
-        grade = "FAIR"
-
-    else:
-
-        grade = "RECALIBRATE"
-
-
-    verification = {
-        "y_px": y_px,
-        "actual_distance_m":
-            actual,
-        "predicted_distance_m":
-            predicted,
-        "signed_error_m":
-            signed_error,
-        "absolute_error_m":
-            abs_error,
-        "percent_error":
-            percent,
-        "grade":
-            grade,
-    }
-
-
-    state[
-        "distance"
-    ][
-        "verifications"
-    ].append(
-        verification
-    )
-
-    save_state(
-        site_id,
-        state,
-    )
-
-
-    return ok(
-        verification=verification
-    )
 
 
 @wizard_bp.post(
@@ -1030,3 +1083,181 @@ def wizard_runtime_schema():
     return ok(
         schema=schema
     )
+
+
+@wizard_bp.post(
+    "/api/wizard/<site_id>/site-location"
+)
+@require_manager_session
+def wizard_site_location(
+    site_id,
+):
+
+    data = payload()
+
+
+    try:
+
+        site = set_site_location(
+            site_id,
+
+            installation_location=
+                data.get(
+                    "installation_location"
+                ),
+
+            latitude=
+                data.get(
+                    "latitude"
+                ),
+
+            longitude=
+                data.get(
+                    "longitude"
+                ),
+        )
+
+
+        state = load_state(
+            site_id
+        )
+
+
+        state[
+            "site_location"
+        ] = site.get(
+            "location"
+        )
+
+
+        save_state(
+            site_id,
+            state,
+        )
+
+
+        return ok(
+            site=site,
+            state=state,
+            runtime_changed=False,
+        )
+
+
+    except Exception as exc:
+
+        return jsonify({
+            "ok": False,
+            "error":
+                f"{type(exc).__name__}: {exc}",
+        }), 400
+
+
+@wizard_bp.get(
+    "/api/wizard/<site_id>/"
+    "capture-image/<capture_set>/<filename>"
+)
+@require_manager_session
+def wizard_capture_image(
+    site_id,
+    capture_set,
+    filename,
+):
+
+    from manager.services.wizard_store import (
+        CANDIDATE_DIR,
+        safe_site_id,
+    )
+
+
+    site_id = safe_site_id(
+        site_id
+    )
+
+
+    if capture_set not in {
+        "main",
+        "holdout",
+    }:
+
+        return jsonify({
+            "ok": False,
+            "error":
+                "invalid_capture_set",
+        }), 400
+
+
+    if (
+        not filename.startswith(
+            "preset_"
+        )
+        or
+        not filename.endswith(
+            ".jpg"
+        )
+    ):
+
+        return jsonify({
+            "ok": False,
+            "error":
+                "invalid_filename",
+        }), 400
+
+
+    number = (
+        filename[
+            len("preset_"):
+            -len(".jpg")
+        ]
+    )
+
+
+    if (
+        not number.isdigit()
+        or
+        not (
+            1
+            <= int(number)
+            <= 9
+        )
+    ):
+
+        return jsonify({
+            "ok": False,
+            "error":
+                "invalid_preset",
+        }), 400
+
+
+    path = (
+        CANDIDATE_DIR
+        / site_id
+        / "ptz_captures"
+        / capture_set
+        / filename
+    )
+
+
+    if not path.exists():
+
+        return jsonify({
+            "ok": False,
+            "error":
+                "capture_not_found",
+        }), 404
+
+
+    response = send_file(
+        path,
+        mimetype="image/jpeg",
+        conditional=True,
+    )
+
+
+    response.headers[
+        "Cache-Control"
+    ] = (
+        "private, no-store, max-age=0"
+    )
+
+
+    return response

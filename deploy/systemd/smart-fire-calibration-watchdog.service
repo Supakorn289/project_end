@@ -1,0 +1,32 @@
+[Unit]
+Description=Smart Fire Calibration Lease Watchdog
+After=local-fs.target smart-fire-manager-agent.service
+Requires=smart-fire-manager-agent.service
+
+[Service]
+Type=simple
+
+User=fire
+Group=fire
+
+WorkingDirectory=/opt/smart-fire-detection-v2
+
+Environment=PYTHONPATH=/opt/smart-fire-detection-v2
+
+ExecStart=/opt/smart-fire-detection-v2/venv/bin/python -m manager.calibration_watchdog
+
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+ReadWritePaths=/opt/smart-fire-detection-v2/calibration/.manager
+
+ProtectKernelTunables=true
+ProtectKernelModules=true
+
+[Install]
+WantedBy=multi-user.target

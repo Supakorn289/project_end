@@ -1,0 +1,30 @@
+[Unit]
+Description=Smart Fire Detection v2 - Manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+User=fire
+Group=fire
+
+WorkingDirectory=/opt/smart-fire-detection-v2
+
+Environment=PYTHONPATH=/opt/smart-fire-detection-v2
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/smart-fire-detection-v2/venv/bin/waitress-serve \
+    --listen=0.0.0.0:5050 \
+    manager.app:app
+
+Restart=on-failure
+RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

@@ -336,14 +336,30 @@ def get_setup_plan(
         )
 
 
+    blocking_statuses = {
+        "REQUIRED",
+        "FIELD_VALIDATION_REQUIRED",
+        "MISSING",
+        "INVALID",
+        "NOT_TESTED",
+        "STALE",
+        "FAIL",
+        "FAILED",
+        "BLOCKED",
+    }
+
+
     hard_blockers = [
         item
         for item
         in checklist
-        if item[
-            "status"
-        ]
-        == "REQUIRED"
+        if str(
+            item.get(
+                "status",
+                ""
+            )
+        ).upper()
+        in blocking_statuses
     ]
 
 

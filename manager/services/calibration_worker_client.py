@@ -118,3 +118,49 @@ def capture_preset(
         "capture_set":
             capture_set,
     })
+
+
+def intrinsics_probe(
+    site_id,
+    camera_source,
+    min_sharpness=0.0,
+):
+
+    return _call({
+        "action":
+            "intrinsics_probe",
+
+        "site_id":
+            site_id,
+
+        "camera_source":
+            camera_source,
+
+        "min_sharpness":
+            float(
+                min_sharpness
+            ),
+    })
+
+
+def intrinsics_capture(
+    site_id,
+    camera_source,
+    min_sharpness=0.0,
+):
+
+    return _call({
+        "action":
+            "intrinsics_capture",
+
+        "site_id":
+            site_id,
+
+        "camera_source":
+            camera_source,
+
+        "min_sharpness":
+            float(
+                min_sharpness
+            ),
+    })

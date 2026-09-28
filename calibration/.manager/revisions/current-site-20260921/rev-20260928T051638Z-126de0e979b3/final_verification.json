@@ -1,0 +1,246 @@
+{
+  "activation_available": false,
+  "activation_status": "BLOCKED",
+  "blocker_count": 1,
+  "blockers": [
+    {
+      "detail": "ยังไม่ได้ Test Camera Candidate",
+      "key": "camera_test",
+      "label": "Camera / RTSP test",
+      "ok": false,
+      "required": true,
+      "source": "wizard-state",
+      "status": "BLOCKED"
+    }
+  ],
+  "candidate_ready": false,
+  "checks": [
+    {
+      "detail": "current-site-20260921 | LAB",
+      "key": "site",
+      "label": "Site registration",
+      "ok": true,
+      "required": true,
+      "source": "manager-registry",
+      "status": "PASS"
+    },
+    {
+      "detail": "ยังไม่ได้กรอกชื่อ/รายละเอียดสถานที่",
+      "key": "location_name",
+      "label": "Installation location",
+      "ok": false,
+      "required": false,
+      "source": "site-registry",
+      "status": "WARN"
+    },
+    {
+      "detail": "ยังไม่มี Latitude / Longitude ที่ถูกต้อง",
+      "key": "gps_location",
+      "label": "GPS location",
+      "ok": false,
+      "required": false,
+      "source": "site-registry",
+      "status": "WARN"
+    },
+    {
+      "detail": "ใช้ Active Runtime เดิม เพราะ Site นี้กำลัง Active อยู่",
+      "key": "camera_config",
+      "label": "Camera configuration",
+      "ok": true,
+      "required": true,
+      "source": "active-runtime",
+      "status": "WARN"
+    },
+    {
+      "detail": "ยังไม่ได้ Test Camera Candidate",
+      "key": "camera_test",
+      "label": "Camera / RTSP test",
+      "ok": false,
+      "required": true,
+      "source": "wizard-state",
+      "status": "BLOCKED"
+    },
+    {
+      "detail": "Intrinsics พร้อม | active-runtime",
+      "key": "intrinsics",
+      "label": "Camera Intrinsics",
+      "ok": true,
+      "required": true,
+      "source": "active-runtime",
+      "status": "PASS"
+    },
+    {
+      "detail": "Existing Active Site: ไม่บังคับ Capture P1-P9 ซ้ำ แต่ Full Sweep จะตรวจอีกครั้งตอน Activation",
+      "key": "ptz_presets",
+      "label": "PTZ P1-P9 evidence",
+      "ok": true,
+      "required": false,
+      "source": "active-runtime",
+      "status": "WARN"
+    },
+    {
+      "detail": "Distance model พร้อม | active-runtime",
+      "key": "distance",
+      "label": "Distance calibration",
+      "ok": true,
+      "required": true,
+      "source": "active-runtime",
+      "status": "PASS"
+    },
+    {
+      "detail": "ยังไม่มี Field Verification",
+      "key": "distance_verify",
+      "label": "Distance verification",
+      "ok": false,
+      "required": false,
+      "source": "wizard-state",
+      "status": "WARN"
+    },
+    {
+      "detail": "Geometry พร้อม | active-runtime",
+      "key": "geometry",
+      "label": "Cross-Preset Geometry",
+      "ok": true,
+      "required": true,
+      "source": "active-runtime",
+      "status": "PASS"
+    },
+    {
+      "detail": "Legacy Active Geometry ไม่มี SHA256 dependency record; อนุญาต reuse สำหรับ Existing Site",
+      "key": "geometry_intrinsics",
+      "label": "Geometry ↔ Intrinsics integrity",
+      "ok": true,
+      "required": true,
+      "source": "active-runtime",
+      "status": "WARN"
+    },
+    {
+      "detail": "True North พร้อม | active-runtime",
+      "key": "true_north",
+      "label": "True North",
+      "ok": true,
+      "required": false,
+      "source": "active-runtime",
+      "status": "PASS"
+    },
+    {
+      "detail": "ยังไม่ได้ตั้ง Telegram Token / Chat ID",
+      "key": "telegram_config",
+      "label": "Telegram configuration",
+      "ok": false,
+      "required": false,
+      "source": "candidate",
+      "status": "WARN"
+    },
+    {
+      "detail": "ยังไม่ได้ส่ง Telegram Test สำเร็จ",
+      "key": "telegram_test",
+      "label": "Telegram notification test",
+      "ok": false,
+      "required": false,
+      "source": "wizard-state",
+      "status": "WARN"
+    }
+  ],
+  "existing_active": true,
+  "mode": "LAB",
+  "ok": true,
+  "ready_for_activation": false,
+  "runtime_changed": false,
+  "runtime_checks": [
+    {
+      "detail": "จะรันอีกครั้งก่อน Atomic Activation",
+      "key": "offline_preflight",
+      "label": "Offline Preflight",
+      "status": "RUN_DURING_ACTIVATION"
+    },
+    {
+      "detail": "จะตรวจ PTZ / Camera / Detection ก่อน Commit",
+      "key": "full_sweep",
+      "label": "Full Sweep Verification",
+      "status": "RUN_DURING_ACTIVATION"
+    },
+    {
+      "detail": "ตรวจ Detection service หลัง restart",
+      "key": "service_health",
+      "label": "Post-Activation Health",
+      "status": "RUN_DURING_ACTIVATION"
+    }
+  ],
+  "site_id": "current-site-20260921",
+  "warning_count": 8,
+  "warnings": [
+    {
+      "detail": "ยังไม่ได้กรอกชื่อ/รายละเอียดสถานที่",
+      "key": "location_name",
+      "label": "Installation location",
+      "ok": false,
+      "required": false,
+      "source": "site-registry",
+      "status": "WARN"
+    },
+    {
+      "detail": "ยังไม่มี Latitude / Longitude ที่ถูกต้อง",
+      "key": "gps_location",
+      "label": "GPS location",
+      "ok": false,
+      "required": false,
+      "source": "site-registry",
+      "status": "WARN"
+    },
+    {
+      "detail": "ใช้ Active Runtime เดิม เพราะ Site นี้กำลัง Active อยู่",
+      "key": "camera_config",
+      "label": "Camera configuration",
+      "ok": true,
+      "required": true,
+      "source": "active-runtime",
+      "status": "WARN"
+    },
+    {
+      "detail": "Existing Active Site: ไม่บังคับ Capture P1-P9 ซ้ำ แต่ Full Sweep จะตรวจอีกครั้งตอน Activation",
+      "key": "ptz_presets",
+      "label": "PTZ P1-P9 evidence",
+      "ok": true,
+      "required": false,
+      "source": "active-runtime",
+      "status": "WARN"
+    },
+    {
+      "detail": "ยังไม่มี Field Verification",
+      "key": "distance_verify",
+      "label": "Distance verification",
+      "ok": false,
+      "required": false,
+      "source": "wizard-state",
+      "status": "WARN"
+    },
+    {
+      "detail": "Legacy Active Geometry ไม่มี SHA256 dependency record; อนุญาต reuse สำหรับ Existing Site",
+      "key": "geometry_intrinsics",
+      "label": "Geometry ↔ Intrinsics integrity",
+      "ok": true,
+      "required": true,
+      "source": "active-runtime",
+      "status": "WARN"
+    },
+    {
+      "detail": "ยังไม่ได้ตั้ง Telegram Token / Chat ID",
+      "key": "telegram_config",
+      "label": "Telegram configuration",
+      "ok": false,
+      "required": false,
+      "source": "candidate",
+      "status": "WARN"
+    },
+    {
+      "detail": "ยังไม่ได้ส่ง Telegram Test สำเร็จ",
+      "key": "telegram_test",
+      "label": "Telegram notification test",
+      "ok": false,
+      "required": false,
+      "source": "wizard-state",
+      "status": "WARN"
+    }
+  ]
+}

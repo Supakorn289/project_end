@@ -2,6 +2,7 @@
 
 import copy
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -14,28 +15,68 @@ import solve_final_rotation_bundle_AB_v2 as bundle
 # SOURCE DATA
 # ============================================================
 
-POS_A_ROOT = Path(
-    Path(
-        "/home/fire/final_session_A_path.txt"
-    ).read_text().strip()
+def _mixed_root(
+    env_name,
+    pointer_file,
+):
+
+    override = (
+        os.getenv(
+            env_name,
+            ""
+        )
+        .strip()
+    )
+
+    if override:
+
+        return Path(
+            override
+        )
+
+
+    return Path(
+        Path(
+            pointer_file
+        ).read_text(
+            encoding="utf-8"
+        ).strip()
+    )
+
+
+POS_A_ROOT = (
+    _mixed_root(
+        "SMART_FIRE_MIXED_POS_A_ROOT",
+        "/home/fire/"
+        "final_session_A_path.txt",
+    )
 )
 
-POS_B_ROOT = Path(
-    Path(
-        "/home/fire/final_session_B_path.txt"
-    ).read_text().strip()
+
+POS_B_ROOT = (
+    _mixed_root(
+        "SMART_FIRE_MIXED_POS_B_ROOT",
+        "/home/fire/"
+        "final_session_B_path.txt",
+    )
 )
 
-NEG_A_ROOT = Path(
-    Path(
-        "/home/fire/final_negative_A2_path.txt"
-    ).read_text().strip()
+
+NEG_A_ROOT = (
+    _mixed_root(
+        "SMART_FIRE_MIXED_NEG_A_ROOT",
+        "/home/fire/"
+        "final_negative_A2_path.txt",
+    )
 )
 
-NEG_B_ROOT = Path(
-    Path(
-        "/home/fire/final_negative_B2_path.txt"
-    ).read_text().strip()
+
+NEG_B_ROOT = (
+    _mixed_root(
+        "SMART_FIRE_MIXED_NEG_B_ROOT",
+        "/home/fire/"
+        "final_negative_B2_path.txt",
+    )
 )
 
 
@@ -61,22 +102,44 @@ NEG_B_MARKS = (
 
 
 TRAIN_MIXED_FILE = Path(
-    "/home/fire/final_mixed_train_marks_v3.json"
+    os.getenv(
+        "SMART_FIRE_MIXED_TRAIN_FILE",
+        "/home/fire/"
+        "final_mixed_train_marks_v3.json",
+    )
 )
+
 
 HOLDOUT_MIXED_FILE = Path(
-    "/home/fire/final_mixed_holdout_marks_v3.json"
+    os.getenv(
+        "SMART_FIRE_MIXED_HOLDOUT_FILE",
+        "/home/fire/"
+        "final_mixed_holdout_marks_v3.json",
+    )
 )
 
-RESULT_FILE = (
-    NEG_B_ROOT
-    / "final_mixed_rotation_AB_v3_result.json"
+
+RESULT_FILE = Path(
+    os.getenv(
+        "SMART_FIRE_MIXED_RESULT_FILE",
+        str(
+            NEG_B_ROOT
+            /
+            "final_mixed_rotation_"
+            "AB_v3_result.json"
+        ),
+    )
 )
+
 
 FINAL_CANDIDATE = Path(
-    "/opt/smart-fire-detection-v2/"
-    "calibration/"
-    "preset_rotation_candidate_MIXED_AB_v3.json"
+    os.getenv(
+        "SMART_FIRE_MIXED_FINAL_CANDIDATE",
+        "/opt/smart-fire-detection-v2/"
+        "calibration/"
+        "preset_rotation_candidate_"
+        "MIXED_AB_v3.json",
+    )
 )
 
 

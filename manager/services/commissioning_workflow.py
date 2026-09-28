@@ -12,33 +12,91 @@ BASE = [
 
     {
         "id": "device",
-        "title": "ตั้งค่า Camera / IP / Protocol",
+        "title": "ตั้งค่าการเชื่อมต่อ Camera",
         "kind": "page",
-        "route": "/settings",
+        "route": "/setup-wizard#camera-connection",
     },
 
     {
         "id": "camera",
-        "title": "ตรวจ Camera / RTSP",
-        "kind": "tool",
-        "tool": "camera.test",
+        "title": "ตรวจ Camera / RTSP Candidate",
+        "kind": "page",
+        "route": "/setup-wizard#camera-connection",
     },
 
     {
         "id": "ptz",
-        "title": "ตรวจ PTZ / Presets / Frame Sync",
+        "title": "PTZ Presets / Frame Sync",
         "kind": "tools",
         "tools": [
             "ptz.test",
             "ptz.frame_sync",
+        ],
+
+        # Preset positions are configured externally.
+        # Manager only documents and verifies them.
+        "external_setup": True,
+        "external_app": "CamFinder",
+
+        "note": (
+            "ตั้ง P1-P9 ผ่าน CamFinder ก่อน "
+            "แล้วใช้ Manager ตรวจ PTZ และ Frame Sync"
+        ),
+
+        "preset_guide": [
+            {
+                "preset": "P1",
+                "relative_deg": 0.0,
+                "label": "Reference / Front",
+            },
+            {
+                "preset": "P2",
+                "relative_deg": 45.0,
+                "label": "Right 45°",
+            },
+            {
+                "preset": "P3",
+                "relative_deg": 90.0,
+                "label": "Right 90°",
+            },
+            {
+                "preset": "P4",
+                "relative_deg": 135.0,
+                "label": "Right 135°",
+            },
+            {
+                "preset": "P5",
+                "relative_deg": 177.5,
+                "label": "Rear / Right side",
+            },
+            {
+                "preset": "P6",
+                "relative_deg": -45.0,
+                "label": "Left 45°",
+            },
+            {
+                "preset": "P7",
+                "relative_deg": -90.0,
+                "label": "Left 90°",
+            },
+            {
+                "preset": "P8",
+                "relative_deg": -135.0,
+                "label": "Left 135°",
+            },
+            {
+                "preset": "P9",
+                "relative_deg": -177.5,
+                "label": "Rear / Left side",
+            },
         ],
     },
 
     {
         "id": "intrinsics",
         "title": "Camera Intrinsics",
-        "kind": "tool",
-        "tool": "intrinsics.calibrate",
+        "kind": "page",
+        "route": "/setup-wizard#intrinsics",
     },
 
     {
@@ -70,9 +128,16 @@ BASE = [
 
     {
         "id": "notification",
-        "title": "Notification",
-        "kind": "tool",
-        "tool": "telegram.test",
+        "title": "ตั้งค่า / ทดสอบ Telegram",
+        "kind": "page",
+        "route": "/setup-wizard#telegram",
+    },
+
+    {
+        "id": "final_verification",
+        "title": "Final Candidate Verification",
+        "kind": "page",
+        "route": "/setup-wizard#final-verification",
     },
 
     {

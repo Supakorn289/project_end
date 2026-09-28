@@ -1,0 +1,35 @@
+[Unit]
+Description=Smart Fire Manager Privileged Agent
+After=local-fs.target
+Before=smart-fire-manager.service
+
+[Service]
+Type=simple
+User=root
+Group=fire
+EnvironmentFile=/etc/smart-fire-detection/production.env
+
+ExecStart=/usr/local/libexec/smart-fire-manager-agent
+
+Restart=on-failure
+RestartSec=2
+
+RuntimeDirectory=smart-fire-manager-agent
+RuntimeDirectoryMode=0750
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+ReadWritePaths=/etc/smart-fire-detection /opt/smart-fire-detection-v2/static
+
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

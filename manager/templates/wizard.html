@@ -284,10 +284,59 @@ small{color:var(--muted)}
             <select id="existingSite"></select>
         </label>
 
-        <div class="row" style="margin-top:12px">
+        <div
+            class="grid2"
+            style="margin-top:12px"
+        >
+
+            <label>
+                สถานที่ติดตั้ง
+                <input
+                    id="existingSiteLocation"
+                    placeholder="เช่น อาคาร A ชั้น 3"
+                >
+            </label>
+
+            <label>
+                Latitude
+                <input
+                    id="existingSiteLat"
+                    type="number"
+                    min="-90"
+                    max="90"
+                    step="0.0000001"
+                >
+            </label>
+
+            <label>
+                Longitude
+                <input
+                    id="existingSiteLon"
+                    type="number"
+                    min="-180"
+                    max="180"
+                    step="0.0000001"
+                >
+            </label>
+
+        </div>
+
+        <div
+            class="row"
+            style="margin-top:12px"
+        >
+
             <button id="btnUseExisting">
                 ใช้พื้นที่นี้
             </button>
+
+            <button
+                id="btnSaveExistingLocation"
+                class="secondary"
+            >
+                บันทึกข้อมูลสถานที่
+            </button>
+
         </div>
     </div>
 
@@ -311,6 +360,38 @@ small{color:var(--muted)}
                 <input
                     id="newSiteName"
                     placeholder="Building A"
+                >
+            </label>
+
+            <label>
+                สถานที่ติดตั้ง
+                <input
+                    id="newSiteLocation"
+                    placeholder="เช่น อาคาร A ชั้น 3"
+                >
+            </label>
+
+            <label>
+                Latitude
+                <input
+                    id="newSiteLat"
+                    type="number"
+                    min="-90"
+                    max="90"
+                    step="0.0000001"
+                    placeholder="18.xxxxxxx"
+                >
+            </label>
+
+            <label>
+                Longitude
+                <input
+                    id="newSiteLon"
+                    type="number"
+                    min="-180"
+                    max="180"
+                    step="0.0000001"
+                    placeholder="98.xxxxxxx"
                 >
             </label>
 
@@ -355,6 +436,107 @@ small{color:var(--muted)}
         ให้แก้ที่ Device Settings ก่อน
     </p>
 
+    <div
+        id="camera-connection"
+        style="margin:18px 0"
+    >
+
+        <h3>
+            Camera Connection
+        </h3>
+
+        <div class="grid2">
+
+            <label>
+                Camera IP
+                <input
+                    id="setupCameraIp"
+                    placeholder="192.168.0.100"
+                >
+            </label>
+
+            <label>
+                HTTP Port
+                <input
+                    id="setupCameraPort"
+                    type="number"
+                    min="1"
+                    max="65535"
+                    value="81"
+                >
+            </label>
+
+            <label>
+                Camera Username
+                <input
+                    id="setupCameraUser"
+                    autocomplete="off"
+                >
+            </label>
+
+            <label>
+                Camera Password
+                <input
+                    id="setupCameraPassword"
+                    type="password"
+                    autocomplete="new-password"
+                >
+            </label>
+
+            <label>
+                RTSP Port
+                <input
+                    id="setupRtspPort"
+                    type="number"
+                    min="1"
+                    max="65535"
+                    value="10554"
+                >
+            </label>
+
+            <label>
+                RTSP Path
+                <input
+                    id="setupRtspPath"
+                    value="/tcp/av0_0"
+                >
+            </label>
+
+        </div>
+
+
+        <div
+            class="row"
+            style="margin-top:12px"
+        >
+
+            <button
+                id="btnSaveCameraSetup"
+                class="green"
+            >
+                บันทึก Camera Candidate
+            </button>
+
+            <button
+                id="btnTestCameraSetup"
+                class="secondary"
+            >
+                ทดสอบ Camera / RTSP
+            </button>
+
+        </div>
+
+
+        <div
+            id="cameraSetupStatus"
+            class="status"
+        >
+            ยังไม่ได้ตั้งค่ากล้อง
+        </div>
+
+    </div>
+
+
     <div class="row">
         <a href="/settings">
             เปิด Device Settings
@@ -381,6 +563,151 @@ small{color:var(--muted)}
     >
         —
     </div>
+</section>
+
+
+<section
+    id="intrinsicsPanel"
+    class="panel hidden"
+>
+
+    <div id="intrinsics"></div>
+
+    <h2>
+        3. Camera Intrinsics
+    </h2>
+
+    <p class="sub">
+        กล้องเดิมสามารถใช้ Intrinsics เดิมได้
+        หากไม่ได้เปลี่ยนกล้อง เลนส์ Zoom Crop
+        หรือ Resolution
+    </p>
+
+    <p class="sub">
+        กล้องใหม่ต้องเก็บภาพ Checkerboard 9×6
+        อย่างน้อย 10 ภาพ
+        แนะนำ 20–30 ภาพจากหลายตำแหน่งและหลายมุม
+    </p>
+
+
+    <div class="row">
+
+        <button
+            id="btnIntrinsicsStatus"
+            class="secondary"
+        >
+            ตรวจสถานะ Intrinsics
+        </button>
+
+        <button
+            id="btnReuseIntrinsics"
+            class="secondary"
+        >
+            ใช้ Intrinsics ปัจจุบัน
+        </button>
+
+        <button
+            id="btnFitIntrinsics"
+            class="green"
+        >
+            Fit Intrinsics Candidate
+        </button>
+
+    </div>
+
+
+    <div
+        style="
+            margin-top:18px;
+            padding-top:18px;
+            border-top:1px solid #263244;
+        "
+    >
+
+        <h3>
+            Checkerboard Capture
+        </h3>
+
+        <p class="sub">
+            ก่อน Capture ให้กด
+            “เริ่ม Calibration Mode”
+            เพื่อหยุด Detection ชั่วคราว
+            และให้ PTZ อยู่ตำแหน่งเดิมตลอดชุดภาพ
+        </p>
+
+        <div class="row">
+
+            <button
+                id="btnProbeIntrinsics"
+                class="secondary"
+            >
+                ตรวจภาพปัจจุบัน
+            </button>
+
+            <button
+                id="btnCaptureIntrinsics"
+                class="green"
+            >
+                บันทึกภาพ Calibration
+            </button>
+
+            <button
+                id="btnResetIntrinsics"
+                class="secondary"
+            >
+                เริ่มชุดภาพใหม่
+            </button>
+
+        </div>
+
+
+        <div
+            id="intrinsicsCaptureStatus"
+            class="status"
+        >
+            ยังไม่ได้ตรวจ Checkerboard
+        </div>
+
+
+        <div
+            style="
+                margin-top:12px;
+                text-align:center;
+            "
+        >
+
+            <img
+                id="intrinsicsPreview"
+                alt="Checkerboard Preview"
+                style="
+                    display:none;
+                    width:100%;
+                    max-width:900px;
+                    height:auto;
+                    border-radius:10px;
+                    border:1px solid #263244;
+                "
+            >
+
+        </div>
+
+    </div>
+
+
+    <div
+        id="intrinsicsStatus"
+        class="status"
+    >
+        ยังไม่ได้เลือก Intrinsics
+    </div>
+
+
+    <p class="sub">
+        Fit ต้องมีภาพอย่างน้อย 10 ภาพ
+        และแนะนำประมาณ 20–30 ภาพ
+        โดยกระจายตำแหน่งและมุมของ Checkerboard
+    </p>
+
 </section>
 
 
@@ -616,8 +943,34 @@ small{color:var(--muted)}
         id="geometryStatus"
         class="status"
     >
-        Mark อย่างน้อยหลายจุดต่อ Pair
+        Mark อย่างน้อย 3 จุดต่อ Pair
         และทำ Holdout แยกจาก Training
+    </div>
+
+    <div
+        class="row"
+        style="margin-top:12px"
+    >
+        <button
+            id="btnGeometryReadiness"
+            class="secondary"
+        >
+            ตรวจความพร้อม Landmark
+        </button>
+
+        <button
+            id="btnPrepareGeometry"
+            class="green"
+        >
+            เตรียมข้อมูลสำหรับ Solver
+        </button>
+
+        <button
+            id="btnSolveGeometry"
+            class="green"
+        >
+            คำนวณ Geometry ด้วย Solver เดิม
+        </button>
     </div>
 </section>
 
@@ -626,26 +979,285 @@ small{color:var(--muted)}
     id="finalPanel"
     class="panel hidden"
 >
-    <h2>7–8. True North / Final Verification</h2>
+
+    <h2>
+        7. True North
+    </h2>
 
     <p class="sub">
-        ขั้นนี้จะเปิดเต็มรูปแบบใน Batch 3B
-        หลังเราตรวจ schema ของ
-        ACTIVE_ROTATION_3D จากเครื่องจริง
+        ใช้ CamFinder เรียก P1
+        แล้ววัดทิศจริงของจุดกลางภาพ
+        ด้วยเข็มทิศหรือแผนที่
+        จากนั้นกรอกค่า 0–360°
     </p>
 
-    <div class="row">
-        <button id="btnInspectSchema">
-            Inspect Runtime Geometry Schema
-        </button>
+    <div class="field">
+
+        <label>
+            Bearing จริงของจุดกลาง P1 (°)
+        </label>
+
+        <input
+            id="northBearing"
+            type="number"
+            min="0"
+            max="360"
+            step="0.01"
+            placeholder="เช่น 24.50"
+        >
+
     </div>
 
+
     <div
-        id="schemaStatus"
+        class="row"
+        style="margin-top:12px"
+    >
+
+        <button
+            id="btnBuildNorth"
+            class="green"
+        >
+            บันทึก True North Candidate
+        </button>
+
+    </div>
+
+
+    <div
+        id="northStatus"
         class="status"
     >
-        —
+        ยังไม่ได้ตั้ง True North
     </div>
+
+
+    <h2
+        style="margin-top:28px"
+    >
+        8. ตำแหน่งกล้อง GPS
+    </h2>
+
+    <p class="sub">
+        กรอกพิกัดจริงของตำแหน่งที่ติดตั้งกล้อง
+        ขั้นนี้ยังไม่เปิด GPS Output
+        จนกว่าจะ Activate Site
+    </p>
+
+
+    <div class="row">
+
+        <div class="field">
+            <label>
+                Latitude
+            </label>
+
+            <input
+                id="cameraLat"
+                type="number"
+                min="-90"
+                max="90"
+                step="0.0000001"
+                placeholder="18.xxxxxxx"
+            >
+        </div>
+
+
+        <div class="field">
+            <label>
+                Longitude
+            </label>
+
+            <input
+                id="cameraLon"
+                type="number"
+                min="-180"
+                max="180"
+                step="0.0000001"
+                placeholder="98.xxxxxxx"
+            >
+        </div>
+
+    </div>
+
+
+    <div
+        class="row"
+        style="margin-top:12px"
+    >
+
+        <button
+            id="btnBuildLocation"
+            class="green"
+        >
+            บันทึก GPS Candidate
+        </button>
+
+    </div>
+
+
+    <div
+        id="locationStatus"
+        class="status"
+    >
+        ยังไม่ได้ตั้งตำแหน่งกล้อง
+    </div>
+
+
+    <div
+        id="telegram"
+        style="
+            margin-top:28px;
+            padding-top:22px;
+            border-top:1px solid #263244;
+        "
+    >
+
+        <h2>
+            9. Telegram Notification
+        </h2>
+
+        <p class="sub">
+            กรอก Bot Token และ Chat ID
+            สำหรับรับข้อความแจ้งเตือนไฟ/ควัน
+            Token จะถูกเก็บเป็น Candidate
+            และจะไม่แสดงกลับบนหน้าเว็บ
+        </p>
+
+
+        <div class="grid2">
+
+            <label>
+                Telegram Bot Token
+
+                <input
+                    id="telegramToken"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="123456789:AA..."
+                >
+            </label>
+
+
+            <label>
+                Telegram Chat ID
+
+                <input
+                    id="telegramChatId"
+                    autocomplete="off"
+                    placeholder="-100xxxxxxxxxx หรือ Chat ID"
+                >
+            </label>
+
+        </div>
+
+
+        <p class="sub">
+            Bot Token ได้จาก BotFather
+            ส่วน Chat ID คือห้องส่วนตัว/กลุ่ม
+            ที่ต้องการรับการแจ้งเตือน
+        </p>
+
+
+        <div class="row">
+
+            <button
+                id="btnSaveTelegram"
+                class="green"
+            >
+                บันทึก Telegram
+            </button>
+
+            <button
+                id="btnTestTelegram"
+                class="secondary"
+            >
+                ส่งข้อความทดสอบ
+            </button>
+
+        </div>
+
+
+        <div
+            id="telegramStatus"
+            class="status"
+        >
+            ยังไม่ได้ตั้งค่า Telegram
+        </div>
+
+    </div>
+
+
+    <div
+        id="final-verification"
+        style="
+            margin-top:30px;
+            padding-top:24px;
+            border-top:1px solid #263244;
+        "
+    >
+
+        <h2>
+            10. Final Verification
+        </h2>
+
+        <p class="sub">
+            ตรวจ Candidate ทั้งหมดก่อนเข้าสู่
+            Activation ขั้นสุดท้าย
+        </p>
+
+
+        <div class="row">
+
+            <button
+                id="btnFinalVerification"
+                class="green"
+            >
+                ตรวจความพร้อมทั้งหมด
+            </button>
+
+        </div>
+
+
+        <div
+            id="finalVerificationStatus"
+            class="status"
+        >
+            ยังไม่ได้ตรวจ Final Verification
+        </div>
+
+    </div>
+
+
+    <details
+        style="margin-top:24px"
+    >
+
+        <summary>
+            Advanced: Runtime Geometry Schema
+        </summary>
+
+        <div
+            class="row"
+            style="margin-top:12px"
+        >
+            <button
+                id="btnInspectSchema"
+                class="secondary"
+            >
+                Inspect Runtime Geometry Schema
+            </button>
+        </div>
+
+        <div
+            id="schemaStatus"
+            class="status"
+        >
+            —
+        </div>
+
+    </details>
+
 </section>
 
 </main>
@@ -654,8 +1266,11 @@ small{color:var(--muted)}
 
 <script>
 let csrf = null;
+let calibrationHeartbeatTimer = null;
+let calibrationHeartbeatSiteId = null;
 let siteId = null;
 let wizardState = null;
+let siteRegistry = {};
 
 let distanceClick = null;
 let geometryClickA = null;
@@ -772,6 +1387,7 @@ async()=>{
 function showAfterSite(){
     [
         "devicePanel",
+        "intrinsicsPanel",
         "capturePanel",
         "distancePanel",
         "verifyPanel",
@@ -786,6 +1402,97 @@ function showAfterSite(){
     );
 
     buildPresetGrid();
+
+
+    if(siteId){
+
+        loadIntrinsicsStatus()
+        .catch(
+            console.error
+        );
+
+
+        loadCameraSetupStatus()
+        .catch(
+            console.error
+        );
+
+
+        loadTelegramStatus()
+        .catch(
+            console.error
+        );
+
+
+        loadFinalVerification()
+        .catch(
+            console.error
+        );
+    }
+}
+
+
+function fillExistingLocationForm(){
+
+    const id =
+        document
+        .getElementById(
+            "existingSite"
+        )
+        .value;
+
+
+    const site =
+        siteRegistry[
+            id
+        ]
+        || {};
+
+
+    const location =
+        site.location
+        || {};
+
+
+    document
+        .getElementById(
+            "existingSiteLocation"
+        )
+        .value =
+        location.installation_location
+        || "";
+
+
+    document
+        .getElementById(
+            "existingSiteLat"
+        )
+        .value =
+        (
+            location.latitude
+            === null
+            ||
+            location.latitude
+            === undefined
+        )
+        ? ""
+        : location.latitude;
+
+
+    document
+        .getElementById(
+            "existingSiteLon"
+        )
+        .value =
+        (
+            location.longitude
+            === null
+            ||
+            location.longitude
+            === undefined
+        )
+        ? ""
+        : location.longitude;
 }
 
 
@@ -799,6 +1506,11 @@ async function loadSites(){
     const sites =
         data.sites
         || {};
+
+
+    siteRegistry =
+        sites;
+
 
     const select =
         document
@@ -826,6 +1538,13 @@ async function loadSites(){
             option
         );
     }
+
+
+    fillExistingLocationForm();
+
+
+    select.onchange =
+        fillExistingLocationForm;
 }
 
 
@@ -842,6 +1561,89 @@ if(entryMode === "new"){
         console.error
     );
 }
+
+
+document
+    .getElementById(
+        "btnSaveExistingLocation"
+    )
+    .onclick =
+async()=>{
+
+    const selected =
+        document
+        .getElementById(
+            "existingSite"
+        )
+        .value;
+
+
+    if(!selected){
+        return;
+    }
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/wizard/${selected}/site-location`,
+                {
+                    method:"POST",
+
+                    body:
+                        JSON.stringify({
+
+                            installation_location:
+                                document
+                                .getElementById(
+                                    "existingSiteLocation"
+                                )
+                                .value
+                                .trim(),
+
+                            latitude:
+                                document
+                                .getElementById(
+                                    "existingSiteLat"
+                                )
+                                .value,
+
+                            longitude:
+                                document
+                                .getElementById(
+                                    "existingSiteLon"
+                                )
+                                .value,
+                        }),
+                }
+            );
+
+
+        siteRegistry[
+            selected
+        ] =
+            data.site;
+
+
+        document
+            .getElementById(
+                "siteStatus"
+            )
+            .textContent =
+            "บันทึกข้อมูลสถานที่เรียบร้อย";
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "siteStatus"
+            )
+            .textContent =
+            String(error);
+    }
+};
 
 
 document
@@ -897,6 +1699,28 @@ async()=>{
                         mode:
                             document
                             .getElementById("newSiteMode")
+                            .value,
+
+                        installation_location:
+                            document
+                            .getElementById(
+                                "newSiteLocation"
+                            )
+                            .value
+                            .trim(),
+
+                        latitude:
+                            document
+                            .getElementById(
+                                "newSiteLat"
+                            )
+                            .value,
+
+                        longitude:
+                            document
+                            .getElementById(
+                                "newSiteLon"
+                            )
                             .value
                     })
                 }
@@ -908,10 +1732,56 @@ async()=>{
         wizardState =
             data.state;
 
+
+        const location =
+            data.site.location
+            || {};
+
+
+        if(
+            location.latitude
+            !== null
+            &&
+            location.latitude
+            !== undefined
+        ){
+
+            document
+                .getElementById(
+                    "cameraLat"
+                )
+                .value =
+                    location.latitude;
+        }
+
+
+        if(
+            location.longitude
+            !== null
+            &&
+            location.longitude
+            !== undefined
+        ){
+
+            document
+                .getElementById(
+                    "cameraLon"
+                )
+                .value =
+                    location.longitude;
+        }
+
+
         document
             .getElementById("siteStatus")
             .textContent =
-            `Created ${siteId} · ${wizardState.mode}`;
+            `Created ${siteId} · ${wizardState.mode}`
+            +
+            (
+                location.installation_location
+                ? ` · ${location.installation_location}`
+                : ""
+            );
 
         showAfterSite();
 
@@ -922,6 +1792,113 @@ async()=>{
             String(error);
     }
 };
+
+
+function stopCalibrationHeartbeat(){
+
+    if(
+        calibrationHeartbeatTimer
+        !== null
+    ){
+
+        clearInterval(
+            calibrationHeartbeatTimer
+        );
+    }
+
+
+    calibrationHeartbeatTimer =
+        null;
+
+    calibrationHeartbeatSiteId =
+        null;
+}
+
+
+async function sendCalibrationHeartbeat(){
+
+    const heartbeatSite =
+        calibrationHeartbeatSiteId;
+
+
+    if(
+        !heartbeatSite
+        ||
+        siteId
+        !== heartbeatSite
+    ){
+
+        stopCalibrationHeartbeat();
+        return;
+    }
+
+
+    try{
+
+        await api(
+            `/api/wizard/${heartbeatSite}/calibration/heartbeat`,
+            {
+                method:"POST",
+                body:"{}",
+            }
+        );
+
+
+    }catch(error){
+
+        console.error(
+            "Calibration heartbeat failed",
+            error
+        );
+
+
+        stopCalibrationHeartbeat();
+
+
+        const box =
+            document.getElementById(
+                "calibrationStatus"
+            );
+
+
+        if(box){
+
+            box.textContent +=
+                "\nHeartbeat lost — "
+                +
+                "Watchdog will resume Detection "
+                +
+                "after lease expiry.";
+        }
+    }
+}
+
+
+function startCalibrationHeartbeat(
+    activeSite
+){
+
+    stopCalibrationHeartbeat();
+
+
+    calibrationHeartbeatSiteId =
+        activeSite;
+
+
+    calibrationHeartbeatTimer =
+        setInterval(
+            sendCalibrationHeartbeat,
+            30000
+        );
+}
+
+
+window.addEventListener(
+    "pagehide",
+    ()=>{
+        stopCalibrationHeartbeat();
+    }
+);
 
 
 document
@@ -947,7 +1924,13 @@ async()=>{
         .textContent =
         "CALIBRATION MODE ACTIVE\n"
         + "Detection paused\n"
-        + "Camera/PTZ reserved for setup";
+        + "Camera/PTZ reserved for setup\n"
+        + "Watchdog lease active";
+
+
+    startCalibrationHeartbeat(
+        siteId
+    );
 };
 
 
@@ -956,6 +1939,9 @@ document
     .onclick =
 async()=>{
     if(!siteId)return;
+
+
+    stopCalibrationHeartbeat();
 
     const data =
         await api(
@@ -1650,6 +2636,1495 @@ async()=>{
 };
 
 
+
+document
+    .getElementById(
+        "btnGeometryReadiness"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/geometry-adapter/${siteId}/status`
+            );
+
+
+        const r =
+            data.readiness;
+
+
+        let text =
+            `Solver ready = ${r.solver_ready}\n\n`;
+
+
+        for(
+            const phase
+            of ["train","holdout"]
+        ){
+
+            text +=
+                `${phase.toUpperCase()}\n`;
+
+
+            for(
+                const [
+                    pair,
+                    item
+                ]
+                of Object.entries(
+                    r[
+                        phase
+                    ]
+                )
+            ){
+
+                text +=
+                    `${pair}: `
+                    +
+                    `${item.count}/`
+                    +
+                    `${r.minimum_points_per_pair} `
+                    +
+                    `${
+                        item.ready
+                        ? "READY"
+                        : "NEED MORE"
+                    }\n`;
+            }
+
+
+            text += "\n";
+        }
+
+
+        document
+            .getElementById(
+                "geometryStatus"
+            )
+            .textContent =
+                text;
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "geometryStatus"
+            )
+            .textContent =
+                String(
+                    error
+                );
+    }
+};
+
+
+document
+    .getElementById(
+        "btnPrepareGeometry"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/geometry-adapter/${siteId}/prepare`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        document
+            .getElementById(
+                "geometryStatus"
+            )
+            .textContent =
+            "SOLVER INPUT READY\n"
+            +
+            `Manifest: ${data.manifest}\n`
+            +
+            "Runtime changed: false";
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "geometryStatus"
+            )
+            .textContent =
+                String(
+                    error
+                );
+    }
+};
+
+
+
+document
+    .getElementById(
+        "btnSolveGeometry"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const accepted = confirm(
+        "คำนวณ Geometry ด้วย "
+        +
+        "solve_final_mixed_rotation_AB_v3.py "
+        +
+        "จาก Candidate marks?\n\n"
+        +
+        "ขั้นตอนนี้ไม่เปลี่ยน Active Runtime"
+    );
+
+
+    if(!accepted){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "geometryStatus"
+        );
+
+
+    box.textContent =
+        "กำลังคำนวณ Geometry...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/geometry-adapter/${siteId}/solve`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        box.textContent =
+            JSON.stringify(
+                data,
+                null,
+                2
+            );
+
+
+    }catch(error){
+
+        box.textContent =
+            String(
+                error
+            );
+    }
+};
+
+
+
+document
+    .getElementById(
+        "btnBuildNorth"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const value =
+        Number(
+            document
+            .getElementById(
+                "northBearing"
+            )
+            .value
+        );
+
+
+    if(
+        !Number.isFinite(value)
+        ||
+        value < 0
+        ||
+        value > 360
+    ){
+
+        document
+            .getElementById(
+                "northStatus"
+            )
+            .textContent =
+            "Bearing ต้องอยู่ระหว่าง 0–360°";
+
+        return;
+    }
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/calibration-adapter/${siteId}/bearing/build`,
+                {
+                    method:"POST",
+
+                    body:
+                        JSON.stringify({
+                            measured_preset1_bearing_deg:
+                                value
+                        }),
+                }
+            );
+
+
+        document
+            .getElementById(
+                "northStatus"
+            )
+            .textContent =
+            JSON.stringify(
+                {
+                    north_offset_deg:
+                        data
+                        .candidate
+                        .north_offset_deg,
+
+                    measured_preset1_bearing_deg:
+                        data
+                        .candidate
+                        .measured_preset1_bearing_deg,
+
+                    runtime_changed:
+                        data.runtime_changed,
+                },
+                null,
+                2
+            );
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "northStatus"
+            )
+            .textContent =
+                String(error);
+    }
+};
+
+
+document
+    .getElementById(
+        "btnBuildLocation"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const latitude =
+        Number(
+            document
+            .getElementById(
+                "cameraLat"
+            )
+            .value
+        );
+
+
+    const longitude =
+        Number(
+            document
+            .getElementById(
+                "cameraLon"
+            )
+            .value
+        );
+
+
+    if(
+        !Number.isFinite(latitude)
+        ||
+        !Number.isFinite(longitude)
+    ){
+
+        document
+            .getElementById(
+                "locationStatus"
+            )
+            .textContent =
+            "กรุณากรอก Latitude / Longitude";
+
+        return;
+    }
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/calibration-adapter/${siteId}/location/build`,
+                {
+                    method:"POST",
+
+                    body:
+                        JSON.stringify({
+                            camera_lat:
+                                latitude,
+
+                            camera_lon:
+                                longitude,
+                        }),
+                }
+            );
+
+
+        document
+            .getElementById(
+                "locationStatus"
+            )
+            .textContent =
+            JSON.stringify(
+                {
+                    camera_lat:
+                        data
+                        .candidate
+                        .camera_lat,
+
+                    camera_lon:
+                        data
+                        .candidate
+                        .camera_lon,
+
+                    runtime_changed:
+                        data.runtime_changed,
+                },
+                null,
+                2
+            );
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "locationStatus"
+            )
+            .textContent =
+                String(error);
+    }
+};
+
+
+
+function showIntrinsicsPreview(
+    url
+){
+
+    if(!url){
+        return;
+    }
+
+
+    const image =
+        document.getElementById(
+            "intrinsicsPreview"
+        );
+
+
+    image.src =
+        url
+        +
+        "?v="
+        +
+        Date.now();
+
+
+    image.style.display =
+        "inline-block";
+}
+
+
+function showIntrinsicsCaptureResult(
+    data
+){
+
+    const box =
+        document.getElementById(
+            "intrinsicsCaptureStatus"
+        );
+
+
+    const accepted =
+        data.accepted
+        ? "PASS"
+        : "REJECT";
+
+
+    box.textContent =
+        `Pattern: ${data.pattern_found ? "FOUND" : "NOT FOUND"}\n`
+        +
+        `Capture quality: ${accepted}\n`
+        +
+        `Sharpness: ${data.sharpness}\n`
+        +
+        `Coverage: ${data.coverage_percent}%\n`
+        +
+        `Center: ${
+            data.center
+            ? data.center.join(", ")
+            : "-"
+        }\n`
+        +
+        `Saved: ${data.saved}\n`
+        +
+        `Captured total: ${data.saved_total}\n`
+        +
+        (
+            data.rejection_reason
+            ? `Reason: ${data.rejection_reason}`
+            : "Ready"
+        );
+
+
+    showIntrinsicsPreview(
+        data.preview_url
+    );
+}
+
+
+document
+    .getElementById(
+        "btnProbeIntrinsics"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "intrinsicsCaptureStatus"
+        );
+
+
+    box.textContent =
+        "กำลังตรวจ Checkerboard...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/intrinsics-setup/${siteId}/probe`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        showIntrinsicsCaptureResult(
+            data
+        );
+
+
+    }catch(error){
+
+        box.textContent =
+            "Probe failed\n"
+            +
+            String(error);
+    }
+};
+
+
+document
+    .getElementById(
+        "btnCaptureIntrinsics"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "intrinsicsCaptureStatus"
+        );
+
+
+    box.textContent =
+        "กำลังตรวจและบันทึกภาพ...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/intrinsics-setup/${siteId}/capture`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        showIntrinsicsCaptureResult(
+            data
+        );
+
+
+        await loadIntrinsicsStatus();
+
+
+    }catch(error){
+
+        box.textContent =
+            "Capture failed\n"
+            +
+            String(error);
+    }
+};
+
+
+document
+    .getElementById(
+        "btnResetIntrinsics"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    if(
+        !confirm(
+            "เริ่มชุด Intrinsics ใหม่?\n\n"
+            +
+            "ภาพเดิมจะถูก Archive "
+            +
+            "ไม่ใช่ลบทิ้ง"
+        )
+    ){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "intrinsicsCaptureStatus"
+        );
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/intrinsics-setup/${siteId}/reset`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        document
+            .getElementById(
+                "intrinsicsPreview"
+            )
+            .style.display =
+                "none";
+
+
+        box.textContent =
+            "เริ่มชุดภาพใหม่แล้ว\n"
+            +
+            `Previous captures: ${data.previous_captures}\n`
+            +
+            `Archived: ${data.archived}`;
+
+
+        await loadIntrinsicsStatus();
+
+
+    }catch(error){
+
+        box.textContent =
+            String(error);
+    }
+};
+
+
+async function loadIntrinsicsStatus(){
+
+    if(!siteId){
+        return;
+    }
+
+
+    const data =
+        await api(
+            `/api/intrinsics-setup/${siteId}/status`
+        );
+
+
+    const s =
+        data.status;
+
+
+    const box =
+        document.getElementById(
+            "intrinsicsStatus"
+        );
+
+
+    const active =
+        s.active
+        || {};
+
+
+    const candidate =
+        s.candidate
+        || {};
+
+
+    box.textContent =
+        `Captures: ${s.captures}\n`
+        +
+        `Minimum: ${s.minimum_views}\n`
+        +
+        `Recommended: ${s.recommended_views.min}-${s.recommended_views.max}\n`
+        +
+        `Fit ready: ${s.fit_ready}\n\n`
+        +
+        `Active exists: ${active.exists}\n`
+        +
+        `Active production valid: ${active.production_valid ?? false}\n\n`
+        +
+        `Candidate exists: ${candidate.exists}\n`
+        +
+        `Candidate production valid: ${candidate.production_valid ?? false}`;
+}
+
+
+document
+    .getElementById(
+        "btnIntrinsicsStatus"
+    )
+    .onclick =
+async()=>{
+
+    try{
+
+        await loadIntrinsicsStatus();
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "intrinsicsStatus"
+            )
+            .textContent =
+            String(error);
+    }
+};
+
+
+document
+    .getElementById(
+        "btnReuseIntrinsics"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    if(
+        !confirm(
+            "ใช้ Camera Intrinsics ที่ Active อยู่ "
+            +
+            "เป็น Candidate ของ Site นี้?\n\n"
+            +
+            "เหมาะเฉพาะเมื่อกล้อง/เลนส์/Zoom/"
+            +
+            "Crop/Resolution ไม่เปลี่ยน"
+        )
+    ){
+        return;
+    }
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/intrinsics-setup/${siteId}/reuse-active`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        document
+            .getElementById(
+                "intrinsicsStatus"
+            )
+            .textContent =
+            "Intrinsics Candidate ready\n"
+            +
+            "Source: REUSED_ACTIVE\n"
+            +
+            `Production valid: ${data.summary.valid_for_production}\n`
+            +
+            `HFOV: ${data.summary.effective_hfov_deg}\n`
+            +
+            "Runtime changed: false";
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "intrinsicsStatus"
+            )
+            .textContent =
+            String(error);
+    }
+};
+
+
+document
+    .getElementById(
+        "btnFitIntrinsics"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    if(
+        !confirm(
+            "Fit Camera Intrinsics จาก "
+            +
+            "Candidate captures?\n\n"
+            +
+            "ผลลัพธ์จะยังไม่ถูก Activate"
+        )
+    ){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "intrinsicsStatus"
+        );
+
+
+    box.textContent =
+        "กำลัง Fit Intrinsics...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/intrinsics-setup/${siteId}/fit`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        box.textContent =
+            "Intrinsics Fit completed\n"
+            +
+            `Production valid: ${data.production_valid}\n`
+            +
+            `Quality: ${data.summary.quality}\n`
+            +
+            `RMS: ${data.summary.opencv_rms_px} px\n`
+            +
+            `Mean: ${data.summary.mean_reprojection_px} px\n`
+            +
+            `Max: ${data.summary.max_reprojection_px} px\n`
+            +
+            `HFOV: ${data.summary.effective_hfov_deg}°\n`
+            +
+            `Views used: ${data.summary.views_used}\n`
+            +
+            `Views rejected: ${data.summary.views_rejected}\n`
+            +
+            "Runtime changed: false";
+
+
+    }catch(error){
+
+        box.textContent =
+            "Intrinsics Fit failed\n"
+            +
+            String(error);
+    }
+};
+
+
+async function loadCameraSetupStatus(){
+
+    if(!siteId){
+        return;
+    }
+
+
+    const data =
+        await api(
+            `/api/camera-setup/${siteId}/status`
+        );
+
+
+    const status =
+        data.status
+        || {};
+
+
+    const box =
+        document.getElementById(
+            "cameraSetupStatus"
+        );
+
+
+    if(!status.configured){
+
+        box.textContent =
+            "ยังไม่มี Camera Candidate";
+
+        return;
+    }
+
+
+    document
+        .getElementById(
+            "setupCameraIp"
+        )
+        .value =
+        status.camera_ip
+        || "";
+
+
+    document
+        .getElementById(
+            "setupCameraPort"
+        )
+        .value =
+        status.camera_port
+        || 81;
+
+
+    document
+        .getElementById(
+            "setupRtspPort"
+        )
+        .value =
+        status.rtsp_port
+        || 10554;
+
+
+    document
+        .getElementById(
+            "setupRtspPath"
+        )
+        .value =
+        status.rtsp_path
+        || "/tcp/av0_0";
+
+
+    box.textContent =
+        "Camera Candidate configured\n"
+        +
+        `IP: ${status.camera_ip}\n`
+        +
+        `HTTP Port: ${status.camera_port}\n`
+        +
+        `User: ${status.camera_user_hint || "configured"}\n`
+        +
+        `Password: ${status.password_configured ? "configured" : "missing"}\n`
+        +
+        `RTSP: ${status.rtsp_port}${status.rtsp_path}\n`
+        +
+        `Tested: ${status.tested ? "PASS" : "ยังไม่ได้ทดสอบ"}`;
+}
+
+
+document
+    .getElementById(
+        "btnSaveCameraSetup"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/camera-setup/${siteId}/save`,
+                {
+                    method:"POST",
+
+                    body:
+                        JSON.stringify({
+
+                            camera_ip:
+                                document
+                                .getElementById(
+                                    "setupCameraIp"
+                                )
+                                .value
+                                .trim(),
+
+                            camera_port:
+                                document
+                                .getElementById(
+                                    "setupCameraPort"
+                                )
+                                .value,
+
+                            camera_user:
+                                document
+                                .getElementById(
+                                    "setupCameraUser"
+                                )
+                                .value
+                                .trim(),
+
+                            camera_password:
+                                document
+                                .getElementById(
+                                    "setupCameraPassword"
+                                )
+                                .value,
+
+                            rtsp_port:
+                                document
+                                .getElementById(
+                                    "setupRtspPort"
+                                )
+                                .value,
+
+                            rtsp_path:
+                                document
+                                .getElementById(
+                                    "setupRtspPath"
+                                )
+                                .value
+                                .trim(),
+                        }),
+                }
+            );
+
+
+        document
+            .getElementById(
+                "setupCameraPassword"
+            )
+            .value = "";
+
+
+        document
+            .getElementById(
+                "cameraSetupStatus"
+            )
+            .textContent =
+            "Camera Candidate saved\n"
+            +
+            `IP: ${data.status.camera_ip}\n`
+            +
+            `HTTP Port: ${data.status.camera_port}\n`
+            +
+            `User: ${data.status.camera_user_hint}\n`
+            +
+            "Password: configured\n"
+            +
+            `RTSP: ${data.status.rtsp_port}${data.status.rtsp_path}\n`
+            +
+            "Runtime changed: false";
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "cameraSetupStatus"
+            )
+            .textContent =
+            String(error);
+    }
+};
+
+
+document
+    .getElementById(
+        "btnTestCameraSetup"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    if(
+        !confirm(
+            "ทดสอบ Camera Candidate จริง?\n\n"
+            +
+            "Detection จะหยุดชั่วคราว "
+            +
+            "และระบบจะเปิดกลับเมื่อทดสอบเสร็จ"
+        )
+    ){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "cameraSetupStatus"
+        );
+
+
+    box.textContent =
+        "กำลังทดสอบ Camera / RTSP...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/camera-setup/${siteId}/test`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        box.textContent =
+            "Camera Test: PASS\n"
+            +
+            `Detection restored: ${data.detection_restored}\n`
+            +
+            "Runtime changed: false";
+
+
+    }catch(error){
+
+        box.textContent =
+            "Camera Test: FAIL\n"
+            +
+            String(error);
+    }
+};
+
+
+async function loadTelegramStatus(){
+
+    if(!siteId){
+        return;
+    }
+
+
+    const data =
+        await api(
+            `/api/telegram-setup/${siteId}/status`
+        );
+
+
+    const status =
+        data.status
+        || {};
+
+
+    const box =
+        document.getElementById(
+            "telegramStatus"
+        );
+
+
+    if(!status.configured){
+
+        box.textContent =
+            "ยังไม่ได้ตั้งค่า Telegram";
+
+        return;
+    }
+
+
+    box.textContent =
+        "Telegram configured\n"
+        +
+        `Token: ${status.token_hint || "configured"}\n`
+        +
+        `Chat ID: ${status.chat_id_hint || "configured"}\n`
+        +
+        `Tested: ${status.tested ? "PASS" : "ยังไม่ได้ทดสอบ"}`;
+}
+
+
+document
+    .getElementById(
+        "btnSaveTelegram"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const token =
+        document
+        .getElementById(
+            "telegramToken"
+        )
+        .value
+        .trim();
+
+
+    const chatId =
+        document
+        .getElementById(
+            "telegramChatId"
+        )
+        .value
+        .trim();
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/telegram-setup/${siteId}/save`,
+                {
+                    method:"POST",
+
+                    body:
+                        JSON.stringify({
+                            telegram_token:
+                                token,
+
+                            telegram_chat_id:
+                                chatId,
+                        }),
+                }
+            );
+
+
+        document
+            .getElementById(
+                "telegramToken"
+            )
+            .value = "";
+
+
+        document
+            .getElementById(
+                "telegramChatId"
+            )
+            .value = "";
+
+
+        document
+            .getElementById(
+                "telegramStatus"
+            )
+            .textContent =
+            "Telegram Candidate saved\n"
+            +
+            `Token: ${data.status.token_hint}\n`
+            +
+            `Chat ID: ${data.status.chat_id_hint}\n`
+            +
+            "Runtime changed: false";
+
+
+    }catch(error){
+
+        document
+            .getElementById(
+                "telegramStatus"
+            )
+            .textContent =
+            String(error);
+    }
+};
+
+
+document
+    .getElementById(
+        "btnTestTelegram"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    if(
+        !confirm(
+            "ส่งข้อความทดสอบจริงไปยัง Telegram ที่ตั้งไว้?"
+        )
+    ){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "telegramStatus"
+        );
+
+
+    box.textContent =
+        "กำลังส่ง Telegram test...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/telegram-setup/${siteId}/test`,
+                {
+                    method:"POST",
+                    body:"{}",
+                }
+            );
+
+
+        box.textContent =
+            "Telegram Test: PASS\n"
+            +
+            `${data.detail}\n`
+            +
+            `Token: ${data.token_hint}\n`
+            +
+            `Chat ID: ${data.chat_id_hint}\n`
+            +
+            "Runtime changed: false";
+
+
+    }catch(error){
+
+        box.textContent =
+            "Telegram Test: FAIL\n"
+            +
+            String(error);
+    }
+};
+
+
+async function loadFinalVerification(){
+
+    if(!siteId){
+        return;
+    }
+
+
+    const box =
+        document.getElementById(
+            "finalVerificationStatus"
+        );
+
+
+    const data =
+        await api(
+            `/api/final-verification/${siteId}`
+        );
+
+
+    let text =
+        `Mode: ${data.mode}\n`
+        +
+        `Candidate Ready: ${
+            data.candidate_ready
+            ? "YES"
+            : "NO"
+        }\n`
+        +
+        `Blockers: ${data.blocker_count}\n`
+        +
+        `Warnings: ${data.warning_count}\n`
+        +
+        `Activation Engine: ${
+            data.activation_available
+            ? "AVAILABLE"
+            : "NOT YET INSTALLED"
+        }\n\n`;
+
+
+    for(
+        const item
+        of data.checks
+    ){
+
+        let icon = "•";
+
+
+        if(item.status === "PASS"){
+            icon = "✓";
+        }
+
+        else if(item.status === "WARN"){
+            icon = "!";
+        }
+
+        else if(item.status === "BLOCKED"){
+            icon = "✗";
+        }
+
+
+        text +=
+            `${icon} [${item.status}] `
+            +
+            `${item.label}\n`
+            +
+            `   ${item.detail}\n`;
+    }
+
+
+    text +=
+        "\nRuntime checks during Activation\n";
+
+
+    for(
+        const item
+        of data.runtime_checks
+    ){
+
+        text +=
+            `→ ${item.label}: `
+            +
+            `${item.status}\n`;
+    }
+
+
+    if(
+        data.blockers
+        &&
+        data.blockers.length
+    ){
+
+        text +=
+            "\nBLOCKERS\n";
+
+
+        for(
+            const item
+            of data.blockers
+        ){
+
+            text +=
+                `- ${item.label}: `
+                +
+                `${item.detail}\n`;
+        }
+    }
+
+
+    box.textContent =
+        text;
+
+
+    return data;
+}
+
+
+document
+    .getElementById(
+        "btnFinalVerification"
+    )
+    .onclick =
+async()=>{
+
+    const box =
+        document.getElementById(
+            "finalVerificationStatus"
+        );
+
+
+    box.textContent =
+        "กำลังตรวจ Candidate ทั้งหมด...";
+
+
+    try{
+
+        await loadFinalVerification();
+
+    }catch(error){
+
+        box.textContent =
+            "Final Verification failed\n"
+            +
+            String(error);
+    }
+};
+
+
 document
     .getElementById("btnInspectSchema")
     .onclick =
@@ -1677,3 +4152,573 @@ authState().catch(
 
 </body>
 </html>
+
+<script>
+(function(){
+
+    function activationEscape(value){
+
+        return String(
+            value ?? ""
+        )
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        );
+    }
+
+
+    function ensureActivationPanel(){
+
+        if(
+            document.getElementById(
+                "activationPanel"
+            )
+        ){
+            return;
+        }
+
+
+        const host =
+            document.getElementById(
+                "final-verification"
+            );
+
+
+        if(!host){
+            return;
+        }
+
+
+        const panel =
+            document.createElement(
+                "div"
+            );
+
+
+        panel.id =
+            "activationPanel";
+
+
+        panel.style.cssText = `
+            margin-top:24px;
+            padding:18px;
+            border:1px solid #334155;
+            border-radius:12px;
+        `;
+
+
+        panel.innerHTML = `
+            <h3 style="margin-top:0">
+                Revision &amp; Activation
+            </h3>
+
+            <p>
+                Final Verification
+                ต้องผ่านก่อนจึงจะ Activate ได้
+            </p>
+
+            <div
+                style="
+                    display:flex;
+                    gap:10px;
+                    flex-wrap:wrap;
+                    margin-bottom:12px;
+                "
+            >
+                <button
+                    type="button"
+                    id="btnCreateRevision"
+                >
+                    Create Revision
+                </button>
+
+                <button
+                    type="button"
+                    id="btnRefreshRevisions"
+                >
+                    Refresh
+                </button>
+            </div>
+
+            <div style="margin-bottom:12px">
+                <select
+                    id="activationRevision"
+                    style="width:100%"
+                >
+                    <option value="">
+                        ยังไม่มี Revision
+                    </option>
+                </select>
+            </div>
+
+            <div
+                style="
+                    display:flex;
+                    gap:10px;
+                    flex-wrap:wrap;
+                "
+            >
+                <button
+                    type="button"
+                    id="btnActivationPlan"
+                >
+                    Check Plan
+                </button>
+
+                <button
+                    type="button"
+                    id="btnActivateRevision"
+                    disabled
+                >
+                    Activate Revision
+                </button>
+            </div>
+
+            <pre
+                id="activationStatus"
+                style="
+                    white-space:pre-wrap;
+                    margin-top:14px;
+                "
+            >ยังไม่ได้ตรวจ Revision</pre>
+        `;
+
+
+        host.appendChild(
+            panel
+        );
+
+
+        document
+        .getElementById(
+            "btnRefreshRevisions"
+        )
+        .onclick =
+            loadActivationRevisions;
+
+
+        document
+        .getElementById(
+            "btnCreateRevision"
+        )
+        .onclick =
+            createActivationRevision;
+
+
+        document
+        .getElementById(
+            "btnActivationPlan"
+        )
+        .onclick =
+            checkActivationPlan;
+
+
+        document
+        .getElementById(
+            "btnActivateRevision"
+        )
+        .onclick =
+            executeActivation;
+
+
+        loadActivationRevisions()
+        .catch(
+            console.error
+        );
+    }
+
+
+    async function loadActivationRevisions(){
+
+        const status =
+            document.getElementById(
+                "activationStatus"
+            );
+
+
+        const select =
+            document.getElementById(
+                "activationRevision"
+            );
+
+
+        const activate =
+            document.getElementById(
+                "btnActivateRevision"
+            );
+
+
+        if(
+            !siteId
+            ||
+            !select
+        ){
+            return;
+        }
+
+
+        activate.disabled =
+            true;
+
+
+        const data =
+            await api(
+                `/api/revisions/${siteId}`
+            );
+
+
+        const revisions =
+            data.revisions
+            || [];
+
+
+        select.innerHTML =
+            "";
+
+
+        if(
+            revisions.length
+            === 0
+        ){
+
+            select.innerHTML =
+                `<option value="">
+                    ยังไม่มี Revision
+                </option>`;
+
+
+            status.textContent =
+                "ยังไม่มี Revision";
+
+            return;
+        }
+
+
+        for(
+            const revision
+            of revisions
+        ){
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                revision.revision_id;
+
+
+            option.dataset.status =
+                revision.status
+                || "";
+
+
+            option.dataset.ready =
+                revision.candidate_ready
+                ? "1"
+                : "0";
+
+
+            option.textContent =
+                (
+                    revision.revision_id
+                    +
+                    " | "
+                    +
+                    (
+                        revision.status
+                        || "UNKNOWN"
+                    )
+                );
+
+
+            select.appendChild(
+                option
+            );
+        }
+
+
+        status.textContent =
+            (
+                `Revision: ${
+                    revisions[0]
+                    .revision_id
+                }\n`
+                +
+                `Status: ${
+                    revisions[0]
+                    .status
+                }`
+            );
+    }
+
+
+    async function createActivationRevision(){
+
+        const status =
+            document.getElementById(
+                "activationStatus"
+            );
+
+
+        if(!siteId){
+            return;
+        }
+
+
+        status.textContent =
+            "กำลังสร้าง immutable revision...";
+
+
+        try{
+
+            const result =
+                await api(
+                    `/api/revisions/${siteId}`,
+                    {
+                        method:
+                            "POST",
+
+                        body:
+                            "{}",
+                    }
+                );
+
+
+            status.textContent =
+                JSON.stringify(
+                    result,
+                    null,
+                    2
+                );
+
+
+            await loadActivationRevisions();
+
+
+        }catch(error){
+
+            status.textContent =
+                String(
+                    error
+                );
+        }
+    }
+
+
+    async function checkActivationPlan(){
+
+        const status =
+            document.getElementById(
+                "activationStatus"
+            );
+
+
+        const select =
+            document.getElementById(
+                "activationRevision"
+            );
+
+
+        const activate =
+            document.getElementById(
+                "btnActivateRevision"
+            );
+
+
+        activate.disabled =
+            true;
+
+
+        if(
+            !siteId
+            ||
+            !select.value
+        ){
+            return;
+        }
+
+
+        try{
+
+            const result =
+                await api(
+                    (
+                        `/api/activation/`
+                        +
+                        `${siteId}/`
+                        +
+                        `${select.value}/plan`
+                    )
+                );
+
+
+            status.textContent =
+                JSON.stringify(
+                    result,
+                    null,
+                    2
+                );
+
+
+            activate.disabled =
+                !result.activatable;
+
+
+        }catch(error){
+
+            status.textContent =
+                String(
+                    error
+                );
+        }
+    }
+
+
+    async function executeActivation(){
+
+        const status =
+            document.getElementById(
+                "activationStatus"
+            );
+
+
+        const select =
+            document.getElementById(
+                "activationRevision"
+            );
+
+
+        const activate =
+            document.getElementById(
+                "btnActivateRevision"
+            );
+
+
+        if(
+            !siteId
+            ||
+            !select.value
+        ){
+            return;
+        }
+
+
+        const confirmed =
+            window.confirm(
+                (
+                    "Activate Revision นี้?\n\n"
+                    +
+                    select.value
+                    +
+                    "\n\n"
+                    +
+                    "ระบบจะ Backup Runtime, "
+                    +
+                    "ตรวจ Preflight และ Rollback "
+                    +
+                    "อัตโนมัติหาก Activation ล้มเหลว"
+                )
+            );
+
+
+        if(!confirmed){
+            return;
+        }
+
+
+        activate.disabled =
+            true;
+
+
+        status.textContent =
+            (
+                "ACTIVATION IN PROGRESS\n"
+                +
+                "อย่าปิดเครื่องหรือถอดไฟ..."
+            );
+
+
+        try{
+
+            const result =
+                await api(
+                    (
+                        `/api/activation/`
+                        +
+                        `${siteId}/`
+                        +
+                        `${select.value}/activate`
+                    ),
+                    {
+                        method:
+                            "POST",
+
+                        body:
+                            "{}",
+                    }
+                );
+
+
+            status.textContent =
+                JSON.stringify(
+                    result,
+                    null,
+                    2
+                );
+
+
+            await loadFinalVerification()
+            .catch(
+                console.error
+            );
+
+
+            await loadActivationRevisions();
+
+
+        }catch(error){
+
+            status.textContent =
+                (
+                    "Activation ไม่สำเร็จ\n"
+                    +
+                    String(
+                        error
+                    )
+                    +
+                    "\n\n"
+                    +
+                    "ตรวจ Rollback Status "
+                    +
+                    "ก่อนทำซ้ำ"
+                );
+        }
+    }
+
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        ()=>{
+            ensureActivationPanel();
+        }
+    );
+
+
+    setTimeout(
+        ensureActivationPanel,
+        500
+    );
+
+})();
+</script>

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import math
+
+from pathlib import Path
 
 from calibration import (
     DistanceModel,
@@ -18,6 +21,120 @@ from geometry import (
 )
 
 
+PROJECT_ROOT = Path(
+    "/opt/smart-fire-detection-v2"
+)
+
+INTRINSICS_FILE = (
+    PROJECT_ROOT
+    / "calibration"
+    / "camera_intrinsics.json"
+)
+
+
+def calibrated_camera_metadata(
+    site_id=None,
+):
+
+    intrinsics_file = (
+        INTRINSICS_FILE
+    )
+
+
+    if site_id:
+
+        candidate = (
+            PROJECT_ROOT
+            / "calibration"
+            / ".manager"
+            / "candidates"
+            / str(
+                site_id
+            )
+            / "camera_intrinsics.json"
+        )
+
+
+        if candidate.exists():
+
+            intrinsics_file = (
+                candidate
+            )
+
+
+    try:
+
+        data = json.loads(
+            intrinsics_file.read_text(
+                encoding="utf-8"
+            )
+        )
+
+    except Exception:
+
+        return {
+            "frame_width":
+                int(
+                    FRAME_WIDTH
+                ),
+
+            "frame_height":
+                int(
+                    FRAME_HEIGHT
+                ),
+
+            "hfov_deg":
+                float(
+                    HFOV_DEG
+                ),
+
+            "source":
+                "runtime-config-fallback",
+        }
+
+
+    hfov = (
+        data.get(
+            "effective_hfov_deg"
+        )
+        or
+        data.get(
+            "hfov_deg"
+        )
+        or
+        HFOV_DEG
+    )
+
+
+    return {
+        "frame_width":
+            int(
+                data.get(
+                    "frame_width",
+                    FRAME_WIDTH,
+                )
+            ),
+
+        "frame_height":
+            int(
+                data.get(
+                    "frame_height",
+                    FRAME_HEIGHT,
+                )
+            ),
+
+        "hfov_deg":
+            float(
+                hfov
+            ),
+
+        "source":
+            str(
+                INTRINSICS_FILE
+            ),
+    }
+
+
 # ============================================================
 # Distance
 # ============================================================
@@ -26,6 +143,7 @@ def build_distance_candidate(
     points,
     *,
     preset=None,
+    site_id=None,
 ):
     """
     ใช้ Distance Engine เดิมของโครงการ:
@@ -122,6 +240,13 @@ def build_distance_candidate(
     )
 
 
+    camera = (
+        calibrated_camera_metadata(
+            site_id=site_id
+        )
+    )
+
+
     # Schema เดียวกับ save_distance_model() เดิม
     candidate = {
         "version": 3,
@@ -143,17 +268,23 @@ def build_distance_candidate(
 
         "frame_width":
             int(
-                model.frame_width
+                camera[
+                    "frame_width"
+                ]
             ),
 
         "frame_height":
             int(
-                model.frame_height
+                camera[
+                    "frame_height"
+                ]
             ),
 
         "hfov_deg":
             float(
-                HFOV_DEG
+                camera[
+                    "hfov_deg"
+                ]
             ),
 
         "points":
@@ -412,6 +543,8 @@ def verify_distance_candidate(
 
 def build_bearing_candidate(
     measured_preset1_bearing_deg,
+    *,
+    site_id=None,
 ):
     """
     Logic เดียวกับ calibrate_bearing.py เดิม.
@@ -453,6 +586,13 @@ def build_bearing_candidate(
         offset -= 360.0
 
 
+    camera = (
+        calibrated_camera_metadata(
+            site_id=site_id
+        )
+    )
+
+
     # Schema เดียวกับ save_site_calibration()
     return {
         "version": 1,
@@ -469,18 +609,30 @@ def build_bearing_candidate(
 
         "frame_width":
             int(
-                FRAME_WIDTH
+                camera[
+                    "frame_width"
+                ]
             ),
 
         "frame_height":
             int(
-                FRAME_HEIGHT
+                camera[
+                    "frame_height"
+                ]
             ),
 
         "hfov_deg":
             float(
-                HFOV_DEG
+                camera[
+                    "hfov_deg"
+                ]
             ),
+
+        "status":
+            "CANDIDATE",
+
+        "runtime_changed":
+            False,
     }
 
 

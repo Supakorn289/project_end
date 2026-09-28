@@ -1683,6 +1683,77 @@ ENABLE_GPS = _env_flag(
 
 
 
+def site_bearing_runtime_ready():
+    """
+    Runtime safety gate for True North / GPS.
+
+    True North is considered calibrated only when:
+      - feature flag is enabled
+      - site calibration exists
+      - required numeric fields are valid
+
+    Final Verification / Activation is responsible
+    for deciding when ENABLE_TRUE_NORTH may be enabled.
+    """
+
+    if not ENABLE_TRUE_NORTH:
+        return False
+
+
+    if not SITE_CALIBRATION_FILE.exists():
+        return False
+
+
+    try:
+
+        payload = json.loads(
+            SITE_CALIBRATION_FILE.read_text(
+                encoding="utf-8"
+            )
+        )
+
+
+        north_offset = float(
+            payload[
+                "north_offset_deg"
+            ]
+        )
+
+
+        measured = float(
+            payload[
+                "measured_preset1_bearing_deg"
+            ]
+        )
+
+
+        if not (
+            math.isfinite(
+                north_offset
+            )
+            and
+            math.isfinite(
+                measured
+            )
+        ):
+
+            return False
+
+
+    except (
+        OSError,
+        KeyError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+    ):
+
+        return False
+
+
+    return True
+
+
 def main():
 
     # ========================================================
@@ -1743,10 +1814,12 @@ def main():
         .exists()
     )
 
-    # Safety lock:
-    # Frozen P1 has not yet been re-anchored
-    # to Absolute True North.
-    site_bearing_calibrated = False
+    # Runtime safety gate:
+    # Activation may enable True North only after
+    # Final Verification has accepted site calibration.
+    site_bearing_calibrated = (
+        site_bearing_runtime_ready()
+    )
 
     if site_bearing_calibrated:
 

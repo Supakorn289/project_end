@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 
 from flask import (
     Blueprint,
@@ -21,7 +22,9 @@ from manager.services.calibration_adapter import (
 
 from manager.services.wizard_store import (
     candidate_path,
+    load_state,
     save_candidate,
+    save_state,
 )
 
 
@@ -222,7 +225,10 @@ def adapter_bearing_build(
             build_bearing_candidate(
                 data[
                     "measured_preset1_bearing_deg"
-                ]
+                ],
+
+                site_id=
+                    site_id,
             )
         )
 
@@ -231,6 +237,29 @@ def adapter_bearing_build(
             site_id,
             "site.json",
             candidate,
+        )
+
+
+        state = load_state(
+            site_id
+        )
+
+
+        state[
+            "north"
+        ][
+            "candidate"
+        ] = candidate
+
+
+        state[
+            "step"
+        ] = "GPS"
+
+
+        save_state(
+            site_id,
+            state,
         )
 
 
@@ -374,3 +403,165 @@ def adapter_status(
         "candidates":
             result,
     })
+
+
+# ============================================================
+# GPS / Site Location Candidate
+# ============================================================
+
+@calibration_adapter_bp.post(
+    "/api/calibration-adapter/"
+    "<site_id>/location/build"
+)
+@require_manager_session
+def adapter_location_build(
+    site_id,
+):
+
+    data = request_json()
+
+
+    try:
+
+        latitude = float(
+            data[
+                "camera_lat"
+            ]
+        )
+
+        longitude = float(
+            data[
+                "camera_lon"
+            ]
+        )
+
+
+        if (
+            not math.isfinite(
+                latitude
+            )
+            or
+            not (
+                -90.0
+                <= latitude
+                <= 90.0
+            )
+        ):
+
+            raise ValueError(
+                "Latitude ต้องอยู่ระหว่าง "
+                "-90 ถึง 90"
+            )
+
+
+        if (
+            not math.isfinite(
+                longitude
+            )
+            or
+            not (
+                -180.0
+                <= longitude
+                <= 180.0
+            )
+        ):
+
+            raise ValueError(
+                "Longitude ต้องอยู่ระหว่าง "
+                "-180 ถึง 180"
+            )
+
+
+        candidate = {
+            "version":
+                1,
+
+            "camera_lat":
+                latitude,
+
+            "camera_lon":
+                longitude,
+
+            "status":
+                "CANDIDATE",
+
+            "runtime_env": {
+                "CAMERA_LAT":
+                    str(
+                        latitude
+                    ),
+
+                "CAMERA_LON":
+                    str(
+                        longitude
+                    ),
+            },
+
+            "runtime_changed":
+                False,
+        }
+
+
+        candidate_file = (
+            save_candidate(
+                site_id,
+                "location.json",
+                candidate,
+            )
+        )
+
+
+        state = load_state(
+            site_id
+        )
+
+
+        state[
+            "gps"
+        ] = {
+            "candidate":
+                candidate,
+        }
+
+
+        state[
+            "step"
+        ] = "FINAL_VERIFY"
+
+
+        save_state(
+            site_id,
+            state,
+        )
+
+
+        return jsonify({
+            "ok": True,
+
+            "candidate":
+                candidate,
+
+            "candidate_file":
+                str(
+                    candidate_file
+                ),
+
+            "runtime_changed":
+                False,
+        })
+
+
+    except Exception as exc:
+
+        return jsonify({
+            "ok": False,
+
+            "error": (
+                f"{type(exc).__name__}: "
+                f"{exc}"
+            ),
+
+            "runtime_changed":
+                False,
+        }), 400
+

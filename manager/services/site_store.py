@@ -217,10 +217,20 @@ def get_calibration_status() -> dict:
         },
 
         "manager": {
-            "mode": "READ_ONLY_DISCOVERY",
+            "mode":
+                "COMMISSIONING_MANAGER",
 
-            "revision_engine": False,
-            "activation_engine": False,
-            "invalidation_engine": False,
+            "revision_engine":
+                True,
+
+            "activation_engine":
+                True,
+
+            # Dependency invalidation for
+            # post-install hardware changes
+            # remains a maintenance feature,
+            # not part of initial commissioning.
+            "invalidation_engine":
+                False,
         },
     }

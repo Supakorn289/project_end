@@ -1,0 +1,36 @@
+{
+  "calibration": [
+    {
+      "exists": true,
+      "path": "/opt/smart-fire-detection-v2/calibration/camera_intrinsics.json",
+      "sha256": "d8bf8c9a3b0ae0fbad4ff9e81180c84b5e132e51ca62c19b5444c401911f5104",
+      "size": 5534
+    },
+    {
+      "exists": true,
+      "path": "/opt/smart-fire-detection-v2/calibration/distance_global.json",
+      "sha256": "4516f45951f08bb271d7c102a832fd4e75e3a92d3593ba174b146227c904a714",
+      "size": 262,
+      "symlink_target": "sites/current-site-20260921/distance_global.json"
+    },
+    {
+      "exists": true,
+      "path": "/opt/smart-fire-detection-v2/calibration/site.json",
+      "sha256": "dd3f8fc1ababe688a0d18a255d3f57dd6b3c549b20f28668ad5681853e346293",
+      "size": 155,
+      "symlink_target": "sites/current-site-20260921/site.json"
+    },
+    {
+      "exists": true,
+      "path": "/opt/smart-fire-detection-v2/calibration/preset_rotation_ACTIVE.json",
+      "sha256": "1b22ec27e512aafa49244287f9811e07cefb4e0cd653210854495ee4b2f02917",
+      "size": 270850,
+      "symlink_target": "sites/current-site-20260921/preset_rotation.json"
+    }
+  ],
+  "production_env": {
+    "exists": true,
+    "path": "/etc/smart-fire-detection/production.env",
+    "sha256": null
+  }
+}

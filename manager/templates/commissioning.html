@@ -491,6 +491,79 @@ function renderStep(
    .join("");
 
 
+ let guide = "";
+
+
+ if(
+   step.external_setup
+   &&
+   Array.isArray(
+     step.preset_guide
+   )
+ ){
+
+   const rows =
+     step.preset_guide
+     .map(
+       item => `
+         <tr>
+           <td>${item.preset}</td>
+           <td>${item.relative_deg}°</td>
+           <td>${item.label}</td>
+         </tr>
+       `
+     )
+     .join("");
+
+
+   guide = `
+     <details
+       style="margin-top:12px"
+     >
+       <summary>
+         วิธีตั้ง P1-P9 ด้วย
+         ${step.external_app || "โปรแกรมภายนอก"}
+       </summary>
+
+       <p class="meta">
+         ${step.note || ""}
+       </p>
+
+       <div
+         style="
+           overflow:auto;
+           margin-top:8px
+         "
+       >
+         <table
+           style="
+             width:100%;
+             border-collapse:collapse
+           "
+         >
+           <thead>
+             <tr>
+               <th>Preset</th>
+               <th>Relative</th>
+               <th>ตำแหน่ง</th>
+             </tr>
+           </thead>
+
+           <tbody>
+             ${rows}
+           </tbody>
+         </table>
+       </div>
+
+       <p class="meta">
+         รักษา Tilt / Zoom ให้เหมือนกันทุก Preset
+         และอย่าตั้ง P5 กับ P9 เป็นตำแหน่งเดียวกันเป๊ะ
+       </p>
+     </details>
+   `;
+ }
+
+
  let routeAction = "";
 
 
@@ -534,6 +607,8 @@ function renderStep(
        ${actions}
        ${routeAction}
      </div>
+
+     ${guide}
 
    </div>
 

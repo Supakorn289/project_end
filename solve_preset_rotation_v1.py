@@ -2,6 +2,7 @@
 
 import json
 import math
+import os
 from collections import deque
 from pathlib import Path
 
@@ -46,29 +47,63 @@ FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
 
 
-SITE_DIR = Path(
-    Path(
-        "/home/fire/current_site_setup_path.txt"
-    ).read_text(
-        encoding="utf-8"
-    ).strip()
+def _manager_path_override(
+    env_name,
+    pointer_file,
+):
+
+    override = (
+        os.getenv(
+            env_name,
+            ""
+        )
+        .strip()
+    )
+
+    if override:
+
+        return Path(
+            override
+        )
+
+
+    return Path(
+        Path(
+            pointer_file
+        ).read_text(
+            encoding="utf-8"
+        ).strip()
+    )
+
+
+SITE_DIR = (
+    _manager_path_override(
+        "SMART_FIRE_SOLVER_SITE_DIR",
+        "/home/fire/"
+        "current_site_setup_path.txt",
+    )
 )
 
 
-CURRENT_VALIDATION_DIR = Path(
-    Path(
-        "/home/fire/current_cross_validation_path.txt"
-    ).read_text(
-        encoding="utf-8"
-    ).strip()
+CURRENT_VALIDATION_DIR = (
+    _manager_path_override(
+        "SMART_FIRE_SOLVER_VALIDATION_DIR",
+        "/home/fire/"
+        "current_cross_validation_path.txt",
+    )
 )
 
 
-INTRINSICS_FILE = (
-    Path("/opt/smart-fire-detection-v2")
-    / "calibration"
-    / "camera_intrinsics.json"
-)
+INTRINSICS_FILE = Path(
+    os.getenv(
+        "SMART_FIRE_SOLVER_INTRINSICS_FILE",
+        (
+            "/opt/smart-fire-detection-v2/"
+            "calibration/"
+            "camera_intrinsics.json"
+        ),
+    )
+).expanduser().resolve()
 
 
 CALIBRATION_MARKS = (

@@ -2,6 +2,7 @@
 
 import json
 import math
+import os
 from pathlib import Path
 
 import cv2
@@ -15,20 +16,50 @@ import solve_preset_rotation_v1 as core
 # FINAL-A / FINAL-B ONLY
 # ============================================================
 
-A_ROOT = Path(
-    Path(
-        "/home/fire/final_session_A_path.txt"
-    ).read_text(
-        encoding="utf-8"
-    ).strip()
+def _bundle_root(
+    env_name,
+    pointer_file,
+):
+
+    override = (
+        os.getenv(
+            env_name,
+            ""
+        )
+        .strip()
+    )
+
+    if override:
+
+        return Path(
+            override
+        )
+
+
+    return Path(
+        Path(
+            pointer_file
+        ).read_text(
+            encoding="utf-8"
+        ).strip()
+    )
+
+
+A_ROOT = (
+    _bundle_root(
+        "SMART_FIRE_BUNDLE_A_ROOT",
+        "/home/fire/"
+        "final_session_A_path.txt",
+    )
 )
 
-B_ROOT = Path(
-    Path(
-        "/home/fire/final_session_B_path.txt"
-    ).read_text(
-        encoding="utf-8"
-    ).strip()
+
+B_ROOT = (
+    _bundle_root(
+        "SMART_FIRE_BUNDLE_B_ROOT",
+        "/home/fire/"
+        "final_session_B_path.txt",
+    )
 )
 
 A_MARKS = (
