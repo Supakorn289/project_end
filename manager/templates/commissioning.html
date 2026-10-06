@@ -155,33 +155,40 @@ pre{
 </a>
 
 <h1>
-Commissioning Workflow
+Advanced Commissioning Tools
 </h1>
 
 <p>
-หน้านี้เป็นตัวควบคุมเครื่องมือเดิมของระบบ
-ไม่ได้สร้าง Camera / PTZ / AI / Calibration engine
-อีกชุดขึ้นมาใหม่
+หน้านี้เป็นเครื่องมือขั้นสูงสำหรับตรวจสอบและเรียกเครื่องมือเดิมของระบบ
+ไม่ใช่หน้าสำหรับสร้างหรือเลือก Site หลัก
+หากต้องการสร้าง Site หรือดำเนินการต่อจาก Site เดิม
+ให้ใช้ Setup Wizard หรือ Control Center
+</p>
+
+<p>
+<a href="/setup-wizard?mode=existing">จัดการ Site ที่มีอยู่</a>
+·
+<a href="/setup-wizard?mode=new">สร้าง Site ใหม่</a>
 </p>
 
 
 <div class="toolbar">
 
 <label>
-Installation
+Workflow policy
 <select id="installation">
 <option value="EXISTING">
-ใช้พื้นที่เดิม
+Reuse / Re-check
 </option>
 <option value="NEW">
-พื้นที่ใหม่
+Full commissioning checks
 </option>
 </select>
 </label>
 
 
 <label>
-Mode
+Policy mode
 <select id="mode">
 <option value="LAB">LAB</option>
 <option value="PRODUCTION">

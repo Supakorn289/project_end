@@ -1,188 +1,445 @@
-from __future__ import annotations
+#!/usr/bin/env bash
+set -euo pipefail
 
-import fcntl
-import hashlib
-import json
-import os
-import shutil
-import subprocess
+cd /opt/smart-fire-detection-v2
 
+STAMP="$(date +%Y%m%d_%H%M%S)"
+BACKUP_DIR="/var/backups/smart-fire/geometry-diagnostics-${STAMP}"
+
+sudo mkdir -p "$BACKUP_DIR"
+
+sudo cp -a \
+  solve_final_mixed_rotation_AB_v3.py \
+  "$BACKUP_DIR/solve_final_mixed_rotation_AB_v3.py"
+
+sudo cp -a \
+  manager/services/geometry_solver_runner.py \
+  "$BACKUP_DIR/geometry_solver_runner.py"
+
+sudo cp -a \
+  manager/templates/wizard.html \
+  "$BACKUP_DIR/wizard.html"
+
+python3 - <<'PY'
 from pathlib import Path
 
+ROOT = Path("/opt/smart-fire-detection-v2")
 
-from manager.services.wizard_store import (
-    candidate_path,
-    load_state,
-    save_candidate,
-    save_state,
-)
+# ============================================================
+# 1) Solver: ตรวจทุก Pair ก่อน แล้วส่ง structured diagnostic
+# ============================================================
 
+solver_path = ROOT / "solve_final_mixed_rotation_AB_v3.py"
+text = solver_path.read_text(encoding="utf-8")
 
-PROJECT_ROOT = Path(
-    "/opt/smart-fire-detection-v2"
-)
+start = text.index("def evaluate_relative_rotation(\n")
+end = text.index("\ndef compact_global(\n", start)
 
-PYTHON = (
-    PROJECT_ROOT
-    / "venv"
-    / "bin"
-    / "python"
-)
-
-SOLVER = (
-    PROJECT_ROOT
-    / "solve_final_mixed_rotation_AB_v3.py"
-)
-
-LOCK_FILE = (
-    PROJECT_ROOT
-    / "calibration"
-    / ".manager"
-    / "geometry_solver.lock"
-)
-
-
-def _sha256_file(
-    path,
+new_function = r'''def evaluate_relative_rotation(
+    train,
+    holdout,
 ):
 
-    digest = hashlib.sha256()
+    print()
+    print("=" * 118)
+    print(
+        "PAIRWISE A -> B TRANSFER DIAGNOSTIC"
+    )
+    print("=" * 118)
+
+    results = {}
+
+    hard_failures = []
+    review_pairs = []
 
 
-    with Path(
-        path
-    ).open(
-        "rb"
-    ) as handle:
+    for index, (a, b) in enumerate(
+        core.PAIR_LIST,
+        start=1,
+    ):
 
-        while True:
+        key = f"{a}-{b}"
 
-            block = handle.read(
-                1024 * 1024
-            )
-
-
-            if not block:
-                break
-
-
-            digest.update(
-                block
-            )
-
-
-    return digest.hexdigest()
-
-
-def _read_json(
-    path,
-):
-
-    return json.loads(
-        Path(
-            path
-        ).read_text(
-            encoding="utf-8"
+        train_count = len(
+            train[
+                key
+            ]
         )
-    )
 
-
-def _copy_json(
-    source,
-    destination,
-):
-
-    source = Path(
-        source
-    )
-
-    destination = Path(
-        destination
-    )
-
-
-    if not source.exists():
-
-        raise FileNotFoundError(
-            source
+        holdout_count = len(
+            holdout[
+                key
+            ]
         )
 
 
-    # Validate JSON before copying.
-    _read_json(
-        source
-    )
+        try:
 
-
-    destination.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-
-    shutil.copyfile(
-        source,
-        destination,
-    )
-
-
-def _summary(
-    candidate,
-):
-
-    holdout = (
-        candidate
-        .get(
-            "post_refit_holdout",
-            {}
-        )
-        .get(
-            "global_metrics",
-            {}
-        )
-    )
-
-
-    return {
-        "status":
-            candidate.get(
-                "status"
-            ),
-
-        "model":
-            candidate.get(
-                "model"
-            ),
-
-        "holdout_passed":
-            bool(
-                candidate
-                .get(
-                    "independent_holdout_gate",
-                    {}
+            fit = (
+                core.robust_relative_rotation(
+                    train[key],
+                    seed=(
+                        81000
+                        + index
+                    ),
                 )
-                .get(
-                    "passed"
-                )
-            ),
-
-        "pair_checks":
-            candidate
-            .get(
-                "independent_holdout_gate",
-                {}
             )
-            .get(
-                "pairs",
-                {}
+
+
+        except Exception as exc:
+
+            residuals = []
+            suspect_mark_index = None
+
+
+            # Best-effort residuals เพื่อช่วยบอกว่า
+            # mark ไหนน่าสงสัยที่สุด
+            try:
+
+                rays_a = np.asarray(
+                    [
+                        obs["ray_a"]
+                        for obs
+                        in train[key]
+                    ],
+                    dtype=float,
+                )
+
+                rays_b = np.asarray(
+                    [
+                        obs["ray_b"]
+                        for obs
+                        in train[key]
+                    ],
+                    dtype=float,
+                )
+
+
+                if (
+                    len(rays_a) >= 2
+                    and
+                    len(rays_a)
+                    ==
+                    len(rays_b)
+                ):
+
+                    direct_R = (
+                        core.fit_rotation_b_to_a(
+                            rays_a,
+                            rays_b,
+                        )
+                    )
+
+                    direct_errors = (
+                        core.residual_angles_deg(
+                            direct_R,
+                            rays_a,
+                            rays_b,
+                        )
+                    )
+
+                    residuals = [
+                        float(value)
+                        for value
+                        in direct_errors
+                    ]
+
+
+                    if residuals:
+
+                        suspect_mark_index = (
+                            int(
+                                np.argmax(
+                                    direct_errors
+                                )
+                            )
+                            + 1
+                        )
+
+
+            except Exception:
+                # Diagnostic ต้องไม่บดบัง root cause เดิม
+                residuals = []
+                suspect_mark_index = None
+
+
+            failure = {
+                "pair":
+                    key,
+
+                "phase":
+                    "train",
+
+                "stage":
+                    "ransac",
+
+                "reason":
+                    str(
+                        exc
+                    ),
+
+                "train_count":
+                    int(
+                        train_count
+                    ),
+
+                "holdout_count":
+                    int(
+                        holdout_count
+                    ),
+
+                "train_residuals_deg":
+                    residuals,
+
+                "suspect_mark_index":
+                    suspect_mark_index,
+            }
+
+
+            hard_failures.append(
+                failure
+            )
+
+
+            results[
+                key
+            ] = {
+                "passed":
+                    False,
+
+                "hard_failure":
+                    True,
+
+                **failure,
+            }
+
+
+            print(
+                f"{key:>5} "
+                f"| train="
+                f"{train_count:3d} "
+                f"| holdout="
+                f"{holdout_count:3d} "
+                f"| FAIL "
+                f"| {exc}"
+            )
+
+
+            continue
+
+
+        R = fit[
+            "R_b_to_a"
+        ]
+
+
+        rays_a = np.asarray(
+            [
+                obs["ray_a"]
+                for obs
+                in holdout[key]
+            ],
+            dtype=float,
+        )
+
+        rays_b = np.asarray(
+            [
+                obs["ray_b"]
+                for obs
+                in holdout[key]
+            ],
+            dtype=float,
+        )
+
+
+        errors = (
+            core.residual_angles_deg(
+                R,
+                rays_a,
+                rays_b,
+            )
+        )
+
+
+        median = float(
+            np.median(
+                errors
+            )
+        )
+
+        p90 = float(
+            np.percentile(
+                errors,
+                90,
+            )
+        )
+
+        maximum = float(
+            np.max(
+                errors
+            )
+        )
+
+
+        passed = (
+            median <= 2.0
+            and
+            p90 <= 3.5
+        )
+
+
+        item = {
+            "pair":
+                key,
+
+            "train_count":
+                int(
+                    train_count
+                ),
+
+            "holdout_count":
+                int(
+                    holdout_count
+                ),
+
+            "median_deg":
+                median,
+
+            "p90_deg":
+                p90,
+
+            "max_deg":
+                maximum,
+
+            "passed":
+                bool(
+                    passed
+                ),
+        }
+
+
+        results[
+            key
+        ] = item
+
+
+        if not passed:
+
+            review_pairs.append(
+                item
+            )
+
+
+        print(
+            f"{key:>5} "
+            f"| train="
+            f"{train_count:3d} "
+            f"| holdout="
+            f"{holdout_count:3d} "
+            f"| median="
+            f"{median:7.3f}° "
+            f"| p90="
+            f"{p90:7.3f}° "
+            f"| max="
+            f"{maximum:7.3f}° "
+            f"| "
+            f"{'PASS' if passed else 'REVIEW'}"
+        )
+
+
+    # --------------------------------------------------------
+    # ถ้า Train RANSAC พังอย่างน้อยหนึ่ง Pair:
+    # ส่ง JSON marker ให้ Manager แสดงสาเหตุในหน้าเว็บ
+    # --------------------------------------------------------
+
+    if hard_failures:
+
+        diagnostic = {
+            "stage":
+                "pairwise_transfer_preflight",
+
+            "hard_failures":
+                hard_failures,
+
+            "review_pairs":
+                review_pairs,
+
+            "ransac_threshold_deg":
+                float(
+                    core.RANSAC_THRESHOLD_DEG
+                ),
+
+            "minimum_pair_inliers":
+                int(
+                    core.MIN_PAIR_INLIERS
+                ),
+        }
+
+
+        print(
+            "GEOMETRY_DIAGNOSTIC_JSON="
+            +
+            json.dumps(
+                diagnostic,
+                ensure_ascii=False,
+                separators=(",", ":"),
             ),
-
-        "global_metrics":
-            holdout,
-    }
+            flush=True,
+        )
 
 
+        raise RuntimeError(
+            "Geometry pair preflight failed: "
+            +
+            ", ".join(
+                item[
+                    "pair"
+                ]
+                for item
+                in hard_failures
+            )
+        )
 
+
+    return results
+
+'''
+
+text = (
+    text[:start]
+    + new_function
+    + text[end:]
+)
+
+solver_path.write_text(
+    text,
+    encoding="utf-8",
+)
+
+
+# ============================================================
+# 2) Manager runner:
+#    parse diagnostic + สร้างข้อความสำหรับ UI
+# ============================================================
+
+runner_path = (
+    ROOT
+    / "manager/services/geometry_solver_runner.py"
+)
+
+text = runner_path.read_text(
+    encoding="utf-8"
+)
+
+marker = "GEOMETRY_DIAGNOSTIC_PREFIX = "
+
+if marker not in text:
+
+    insert_at = text.index(
+        "def run_existing_geometry_solver(\n"
+    )
+
+    helpers = r'''
 GEOMETRY_DIAGNOSTIC_PREFIX = (
     "GEOMETRY_DIAGNOSTIC_JSON="
 )
@@ -701,436 +958,27 @@ def _holdout_failure_user_message(
     )
 
 
-def run_existing_geometry_solver(
-    site_id,
-):
+'''
 
-    if not SOLVER.exists():
-
-        return {
-            "ok": False,
-            "error":
-                "existing_solver_missing",
-        }
-
-
-    manifest_path = (
-        candidate_path(
-            site_id,
-            "geometry_inputs/"
-            "manifest.json",
-        )
+    text = (
+        text[:insert_at]
+        + helpers
+        + text[insert_at:]
     )
 
 
-    if not manifest_path.exists():
+# -------- process.returncode != 0 --------
 
-        return {
-            "ok": False,
+start = text.index(
+    "    if process.returncode != 0:\n"
+)
 
-            "error":
-                "solver_inputs_not_prepared",
-        }
+end = text.index(
+    "\n\n    if not candidate_file.exists():",
+    start,
+)
 
-
-    manifest = (
-        _read_json(
-            manifest_path
-        )
-    )
-
-
-    intrinsics_file = (
-        candidate_path(
-            site_id,
-            "camera_intrinsics.json",
-        )
-    )
-
-
-    if not intrinsics_file.exists():
-
-        return {
-            "ok": False,
-
-            "error":
-                "intrinsics_candidate_missing",
-
-            "detail":
-                (
-                    "เลือก Reuse Active Intrinsics "
-                    "หรือ Fit Intrinsics Candidate "
-                    "ก่อน Solve Geometry"
-                ),
-
-            "runtime_changed":
-                False,
-        }
-
-
-    intrinsics_sha256 = (
-        _sha256_file(
-            intrinsics_file
-        )
-    )
-
-
-    inputs = manifest.get(
-        "inputs",
-        {}
-    )
-
-
-    required = {
-        "positive_train":
-            (
-                "positive_train",
-                "cross_preset_marks_FINAL_A.json",
-            ),
-
-        "positive_holdout":
-            (
-                "positive_holdout",
-                "cross_preset_marks_FINAL_B.json",
-            ),
-
-        "negative_train":
-            (
-                "negative_train",
-                "negative_side_marks_FINAL_A2.json",
-            ),
-
-        "negative_holdout":
-            (
-                "negative_holdout",
-                "negative_side_marks_FINAL_B2.json",
-            ),
-    }
-
-
-    workspace = (
-        candidate_path(
-            site_id,
-            "geometry_solver_workspace",
-        )
-    )
-
-
-    workspace.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-
-    roots = {}
-
-
-    for (
-        key,
-        (
-            dirname,
-            filename,
-        ),
-    ) in required.items():
-
-        if key not in inputs:
-
-            return {
-                "ok": False,
-
-                "error":
-                    f"missing_input:{key}",
-            }
-
-
-        root = (
-            workspace
-            / dirname
-        )
-
-        root.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-
-        _copy_json(
-            inputs[
-                key
-            ],
-
-            root
-            / filename,
-        )
-
-
-        roots[
-            key
-        ] = root
-
-
-    compatibility_site = (
-        workspace
-        / "compat_site"
-    )
-
-    compatibility_validation = (
-        workspace
-        / "compat_validation"
-    )
-
-
-    compatibility_site.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    compatibility_validation.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-
-    train_file = (
-        workspace
-        / "final_mixed_train_marks_v3.json"
-    )
-
-    holdout_file = (
-        workspace
-        / "final_mixed_holdout_marks_v3.json"
-    )
-
-    result_file = (
-        workspace
-        / "final_mixed_rotation_AB_v3_result.json"
-    )
-
-    candidate_file = (
-        workspace
-        / "preset_rotation_candidate_MIXED_AB_v3.json"
-    )
-
-    stdout_file = (
-        workspace
-        / "solver.stdout.txt"
-    )
-
-    stderr_file = (
-        workspace
-        / "solver.stderr.txt"
-    )
-
-
-    # Never accept a stale candidate.
-    for path in (
-        train_file,
-        holdout_file,
-        result_file,
-        candidate_file,
-    ):
-
-        try:
-            path.unlink()
-
-        except FileNotFoundError:
-            pass
-
-
-    env = os.environ.copy()
-
-
-    # Geometry MUST use the Intrinsics Candidate
-    # belonging to this Site.
-    env[
-        "SMART_FIRE_SOLVER_INTRINSICS_FILE"
-    ] = str(
-        intrinsics_file
-    )
-
-
-    # solve_preset_rotation_v1.py
-    env[
-        "SMART_FIRE_SOLVER_SITE_DIR"
-    ] = str(
-        compatibility_site
-    )
-
-    env[
-        "SMART_FIRE_SOLVER_VALIDATION_DIR"
-    ] = str(
-        compatibility_validation
-    )
-
-
-    # solve_final_rotation_bundle_AB_v2.py
-    env[
-        "SMART_FIRE_BUNDLE_A_ROOT"
-    ] = str(
-        roots[
-            "positive_train"
-        ]
-    )
-
-    env[
-        "SMART_FIRE_BUNDLE_B_ROOT"
-    ] = str(
-        roots[
-            "positive_holdout"
-        ]
-    )
-
-
-    # solve_final_mixed_rotation_AB_v3.py
-    env[
-        "SMART_FIRE_MIXED_POS_A_ROOT"
-    ] = str(
-        roots[
-            "positive_train"
-        ]
-    )
-
-    env[
-        "SMART_FIRE_MIXED_POS_B_ROOT"
-    ] = str(
-        roots[
-            "positive_holdout"
-        ]
-    )
-
-    env[
-        "SMART_FIRE_MIXED_NEG_A_ROOT"
-    ] = str(
-        roots[
-            "negative_train"
-        ]
-    )
-
-    env[
-        "SMART_FIRE_MIXED_NEG_B_ROOT"
-    ] = str(
-        roots[
-            "negative_holdout"
-        ]
-    )
-
-    env[
-        "SMART_FIRE_MIXED_TRAIN_FILE"
-    ] = str(
-        train_file
-    )
-
-    env[
-        "SMART_FIRE_MIXED_HOLDOUT_FILE"
-    ] = str(
-        holdout_file
-    )
-
-    env[
-        "SMART_FIRE_MIXED_RESULT_FILE"
-    ] = str(
-        result_file
-    )
-
-    env[
-        "SMART_FIRE_MIXED_FINAL_CANDIDATE"
-    ] = str(
-        candidate_file
-    )
-
-
-    LOCK_FILE.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    LOCK_FILE.touch(
-        exist_ok=True
-    )
-
-
-    with LOCK_FILE.open(
-        "r+"
-    ) as lock:
-
-        try:
-
-            fcntl.flock(
-                lock,
-                (
-                    fcntl.LOCK_EX
-                    |
-                    fcntl.LOCK_NB
-                ),
-            )
-
-        except BlockingIOError:
-
-            return {
-                "ok": False,
-                "error":
-                    "geometry_solver_busy",
-            }
-
-
-        try:
-
-            process = subprocess.run(
-                [
-                    str(
-                        PYTHON
-                    ),
-                    str(
-                        SOLVER
-                    ),
-                ],
-
-                cwd=str(
-                    PROJECT_ROOT
-                ),
-
-                env=env,
-
-                capture_output=True,
-                text=True,
-
-                timeout=300,
-
-                check=False,
-            )
-
-
-        except subprocess.TimeoutExpired:
-
-            return {
-                "ok": False,
-                "error":
-                    "geometry_solver_timeout",
-            }
-
-
-        finally:
-
-            fcntl.flock(
-                lock,
-                fcntl.LOCK_UN,
-            )
-
-
-    stdout_file.write_text(
-        process.stdout
-        or "",
-        encoding="utf-8",
-    )
-
-    stderr_file.write_text(
-        process.stderr
-        or "",
-        encoding="utf-8",
-    )
-
-
-    if process.returncode != 0:
+replacement = r'''    if process.returncode != 0:
 
         diagnostic = (
             _extract_geometry_diagnostic(
@@ -1174,9 +1022,27 @@ def run_existing_geometry_solver(
             "runtime_changed":
                 False,
         }
+'''
+
+text = (
+    text[:start]
+    + replacement
+    + text[end:]
+)
 
 
-    if not candidate_file.exists():
+# -------- candidate missing / holdout failed --------
+
+start = text.index(
+    "    if not candidate_file.exists():\n"
+)
+
+end = text.index(
+    "\n\n    candidate = (",
+    start,
+)
+
+replacement = r'''    if not candidate_file.exists():
 
         diagnostic = (
             _holdout_gate_diagnostic(
@@ -1218,153 +1084,116 @@ def run_existing_geometry_solver(
             "runtime_changed":
                 False,
         }
+'''
+
+text = (
+    text[:start]
+    + replacement
+    + text[end:]
+)
 
 
-    candidate = (
-        _read_json(
-            candidate_file
+runner_path.write_text(
+    text,
+    encoding="utf-8",
+)
+
+
+# ============================================================
+# 3) Wizard API helper:
+#    ถ้ามี user_message ให้แสดงข้อความละเอียดแทน error code
+# ============================================================
+
+wizard_path = (
+    ROOT
+    / "manager/templates/wizard.html"
+)
+
+text = wizard_path.read_text(
+    encoding="utf-8"
+)
+
+api_start = text.index(
+    "async function api("
+)
+
+api_end = text.index(
+    "async function authState()",
+    api_start,
+)
+
+segment = text[
+    api_start:
+    api_end
+]
+
+old = '''        throw new Error(
+            data.error
+            || JSON.stringify(data)
+        );'''
+
+new = '''        throw new Error(
+            data.user_message
+            || data.error
+            || JSON.stringify(data)
+        );'''
+
+if old not in segment:
+
+    if "data.user_message" not in segment:
+        raise RuntimeError(
+            "wizard api() error block not found"
         )
+
+else:
+
+    segment = segment.replace(
+        old,
+        new,
+        1,
+    )
+
+    text = (
+        text[:api_start]
+        + segment
+        + text[api_end:]
     )
 
 
-    valid = bool(
-        candidate.get(
-            "status"
-        )
-        ==
-        "PASS_CANDIDATE_NOT_INSTALLED"
+wizard_path.write_text(
+    text,
+    encoding="utf-8",
+)
 
-        and
+print("GEOMETRY_SOLVER_DIAGNOSTICS=UPDATED")
+PY
 
-        candidate.get(
-            "model"
-        )
-        ==
-        "calibrated-global-raw-ray-rotation"
+# ============================================================
+# Validation
+# ============================================================
 
-        and
+./venv/bin/python -m py_compile \
+  solve_final_mixed_rotation_AB_v3.py \
+  manager/services/geometry_solver_runner.py
 
-        candidate
-        .get(
-            "independent_holdout_gate",
-            {}
-        )
-        .get(
-            "passed"
-        )
-        is True
-    )
+git diff --check
 
+grep -nE \
+  'GEOMETRY_DIAGNOSTIC_JSON|hard_failures|user_message|data.user_message' \
+  solve_final_mixed_rotation_AB_v3.py \
+  manager/services/geometry_solver_runner.py \
+  manager/templates/wizard.html
 
-    if not valid:
+sudo systemctl restart smart-fire-manager.service
 
-        return {
-            "ok": False,
+echo
+echo "manager:"
+systemctl is-active smart-fire-manager.service
 
-            "error":
-                "candidate_validation_failed",
+echo "detection:"
+systemctl is-active smart-fire-detection.service || true
 
-            "summary":
-                _summary(
-                    candidate
-                ),
-
-            "runtime_changed":
-                False,
-        }
-
-
-    # Copy only into Manager candidate storage.
-    # Active runtime is still untouched.
-    manager_candidate = (
-        save_candidate(
-            site_id,
-            "preset_rotation.json",
-            candidate,
-        )
-    )
-
-
-    state = load_state(
-        site_id
-    )
-
-
-    state[
-        "geometry"
-    ][
-        "candidate"
-    ] = candidate
-
-
-    state[
-        "geometry"
-    ][
-        "solver_result"
-    ] = {
-        "engine":
-            "solve_final_mixed_"
-            "rotation_AB_v3.py",
-
-        "candidate_file":
-            str(
-                manager_candidate
-            ),
-
-        "workspace":
-            str(
-                workspace
-            ),
-
-        "passed":
-            True,
-
-        "intrinsics_file":
-            str(
-                intrinsics_file
-            ),
-
-        "intrinsics_sha256":
-            intrinsics_sha256,
-    }
-
-
-    state[
-        "step"
-    ] = "TRUE_NORTH"
-
-
-    save_state(
-        site_id,
-        state,
-    )
-
-
-    return {
-        "ok": True,
-
-        "engine":
-            "solve_final_mixed_"
-            "rotation_AB_v3.py",
-
-        "summary":
-            _summary(
-                candidate
-            ),
-
-        "candidate_file":
-            str(
-                manager_candidate
-            ),
-
-        "workspace":
-            str(
-                workspace
-            ),
-
-        "intrinsics_sha256":
-            intrinsics_sha256,
-
-        "runtime_changed":
-            False,
-    }
+echo
+echo "Backup: $BACKUP_DIR"
+echo
+echo "PATCH COMPLETE"

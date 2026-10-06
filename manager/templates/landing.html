@@ -2,12 +2,8 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta
-    name="viewport"
-    content="width=device-width,initial-scale=1"
->
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smart Fire Setup</title>
-
 <style>
 *{box-sizing:border-box}
 body{
@@ -19,28 +15,11 @@ body{
     color:#f6f8fb;
     font-family:system-ui,sans-serif
 }
-main{
-    width:min(1050px,calc(100% - 32px));
-}
-.kicker{
-    color:#72a9ff;
-    font-weight:700;
-    margin-bottom:8px
-}
-h1{
-    margin:0 0 10px;
-    font-size:clamp(30px,4vw,52px)
-}
-.lead{
-    color:#94a3b8;
-    max-width:700px;
-    margin-bottom:32px
-}
-.grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:18px
-}
+main{width:min(1050px,calc(100% - 32px))}
+.kicker{color:#72a9ff;font-weight:700;margin-bottom:8px}
+h1{margin:0 0 10px;font-size:clamp(30px,4vw,52px)}
+.lead{color:#94a3b8;max-width:760px;margin-bottom:32px;line-height:1.65}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .card{
     display:block;
     text-decoration:none;
@@ -52,14 +31,8 @@ h1{
     min-height:240px;
     transition:.15s
 }
-.card:hover{
-    border-color:#579bff;
-    transform:translateY(-2px)
-}
-.icon{
-    font-size:34px;
-    margin-bottom:25px
-}
+.card:hover{border-color:#579bff;transform:translateY(-2px)}
+.icon{font-size:34px;margin-bottom:25px}
 h2{margin:0 0 9px}
 p{color:#93a4ba;line-height:1.65}
 .tag{
@@ -70,82 +43,50 @@ p{color:#93a4ba;line-height:1.65}
     padding:7px 11px;
     color:#9abaff
 }
-.footer{
-    margin-top:24px;
-    display:flex;
-    gap:20px
-}
-.footer a{
-    color:#89b9ff
-}
-@media(max-width:700px){
-    .grid{grid-template-columns:1fr}
-}
+.footer{margin-top:24px;display:flex;gap:20px;flex-wrap:wrap}
+.footer a{color:#89b9ff}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
-
 <body>
 <main>
-
-<div class="kicker">
-    SMART FIRE CONTROL CENTER
-</div>
-
-<h1>
-    ตั้งค่าระบบตรวจจับไฟ
-</h1>
-
+<div class="kicker">SMART FIRE CONTROL CENTER</div>
+<h1>ตั้งค่าระบบตรวจจับไฟ</h1>
 <div class="lead">
-    เลือกว่าจะใช้ Calibration ของพื้นที่เดิม
-    หรือเริ่มตั้งค่าพื้นที่ใหม่แบบ Wizard
-    ตั้งแต่ Camera, PTZ, Distance,
-    Cross-Preset Geometry จนถึง Verification
+    Site คือหน่วยการตั้งค่าของแต่ละพื้นที่ติดตั้ง
+    Site ที่สร้างแล้วสามารถกลับมาทำต่อ ตรวจสอบ หรือ Calibrate ใหม่ได้
+    โดยไม่เปลี่ยน Active Runtime จนกว่าจะผ่าน Verification และ Activate
 </div>
 
 <div class="grid">
-
-<a
-    class="card"
-    href="/commissioning?installation=EXISTING"
->
+<a class="card" href="/setup-wizard?mode=existing">
     <div class="icon">↩</div>
-    <h2>ใช้พื้นที่เดิม</h2>
+    <h2>จัดการ Site ที่มีอยู่</h2>
     <p>
-        เลือก Site ที่เคย Calibration แล้ว
-        ตรวจสถานะ ใช้งานต่อ
-        หรือตรวจ/Calibrate ใหม่เฉพาะส่วน
+        เลือก Site ที่เคยสร้างไว้ ไม่ว่าจะเป็น DRAFT, CANDIDATE,
+        VALIDATED หรือ ACTIVE แล้วดำเนินการตั้งค่าต่อ ตรวจสอบ
+        หรือ Calibrate ใหม่เฉพาะส่วน
     </p>
-    <span class="tag">
-        Existing Site
-    </span>
+    <span class="tag">Existing Sites</span>
 </a>
 
-<a
-    class="card"
-    href="/commissioning?installation=NEWhref="/setup-wizard?mode=new"mode=LAB"
->
+<a class="card" href="/setup-wizard?mode=new">
     <div class="icon">＋</div>
-    <h2>ตั้งค่าพื้นที่ใหม่</h2>
+    <h2>สร้าง Site ใหม่</h2>
     <p>
-        สร้าง Site ใหม่ เลือก LAB หรือ PRODUCTION
-        แล้วระบบจะพา Calibration ทีละขั้น
+        สร้างพื้นที่ติดตั้งใหม่ เลือก LAB หรือ PRODUCTION
+        แล้วทำ Camera, Intrinsics, PTZ, Distance,
+        Cross-Preset Geometry และ Verification ตามลำดับ
     </p>
-    <span class="tag">
-        New Installation
-    </span>
+    <span class="tag">New Site</span>
 </a>
-
 </div>
 
 <div class="footer">
-    <a href="/overview">
-        Control Center
-    </a>
-    <a href="/settings">
-        Device Settings
-    </a>
+    <a href="/overview">Control Center</a>
+    <a href="/settings">Device Settings</a>
+    <a href="/commissioning">Advanced Tools</a>
 </div>
-
 </main>
 </body>
 </html>

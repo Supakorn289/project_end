@@ -207,80 +207,39 @@
             id="page-setup"
             class="page"
         >
-
             <div class="panel">
-
                 <div class="panel-head">
                     <div>
-                        <h2>
-                            Setup Wizard
-                        </h2>
-
+                        <h2>Site Setup</h2>
                         <p>
-                            Existing or new installation
+                            เลือกทำต่อจาก Site ที่มีอยู่ หรือสร้าง Site ใหม่
                         </p>
                     </div>
                 </div>
 
-
                 <div class="choice-grid">
-
-                    <button
+                    <a
                         class="choice"
-                        id="existing-choice"
+                        href="/setup-wizard?mode=existing"
                     >
-                        <strong>
-                            Existing Site
-                        </strong>
-
+                        <strong>จัดการ Site ที่มีอยู่</strong>
                         <span>
-                            Detect and reuse current calibration
+                            Resume DRAFT / CANDIDATE, ตรวจ ACTIVE
+                            หรือ Calibrate ใหม่เฉพาะส่วน
                         </span>
-                    </button>
+                    </a>
 
-
-                    <button
+                    <a
                         class="choice"
-                        id="new-choice"
+                        href="/setup-wizard?mode=new"
                     >
-                        <strong>
-                            New Site
-                        </strong>
-
+                        <strong>+ สร้าง Site ใหม่</strong>
                         <span>
-                            Start a new installation workflow
+                            สร้าง Site แยกใหม่โดยยังไม่แตะ Active Runtime
                         </span>
-                    </button>
-
+                    </a>
                 </div>
-
-
-                <div class="mode-row">
-
-                    <button
-                        class="mode-btn active"
-                        data-mode="LAB"
-                    >
-                        LAB
-                    </button>
-
-                    <button
-                        class="mode-btn"
-                        data-mode="PRODUCTION"
-                    >
-                        PRODUCTION
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="setup-plan"
-                    class="wizard-list"
-                ></div>
-
             </div>
-
         </section>
 
 
@@ -292,11 +251,15 @@
                 <div class="panel-head">
                     <div>
                         <h2>Sites</h2>
-                        <p>Runtime and Manager registry</p>
+                        <p>
+                            Manager registry และสถานะ Runtime ของแต่ละ Site
+                        </p>
                     </div>
                 </div>
 
-                <pre id="sites-json"></pre>
+                <div id="sites-list" class="site-list">
+                    Loading sites...
+                </div>
             </div>
         </section>
 

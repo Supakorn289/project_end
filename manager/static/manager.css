@@ -493,3 +493,126 @@ pre {
     color: var(--text);
     background: var(--panel2);
 }
+
+
+/* MANAGER_SITE_UI_V2 */
+
+.choice {
+    display: block;
+    text-decoration: none;
+}
+
+.site-list {
+    display: grid;
+    gap: 12px;
+}
+
+.site-card {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.site-card.runtime-active {
+    border-color: var(--good);
+}
+
+.site-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.site-name {
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.site-id {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.site-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.site-badge {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 11px;
+}
+
+.site-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.site-meta-grid > div {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 10px;
+}
+
+.site-meta-grid span,
+.site-meta-grid strong {
+    display: block;
+}
+
+.site-meta-grid span {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.site-meta-grid strong {
+    margin-top: 5px;
+    overflow-wrap: anywhere;
+}
+
+.site-actions {
+    margin-top: 14px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.site-action {
+    display: inline-block;
+    text-decoration: none;
+    background: var(--info);
+    color: #07101c;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+@media (max-width: 800px) {
+    .site-meta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    .site-card-head {
+        flex-direction: column;
+    }
+
+    .site-badges {
+        justify-content: flex-start;
+    }
+
+    .site-meta-grid {
+        grid-template-columns: 1fr;
+    }
+}

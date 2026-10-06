@@ -314,6 +314,9 @@ def evaluate_relative_rotation(
 
     results = {}
 
+    hard_failures = []
+    review_pairs = []
+
 
     for index, (a, b) in enumerate(
         core.PAIR_LIST,
@@ -322,16 +325,172 @@ def evaluate_relative_rotation(
 
         key = f"{a}-{b}"
 
-
-        fit = (
-            core.robust_relative_rotation(
-                train[key],
-                seed=(
-                    81000
-                    + index
-                ),
-            )
+        train_count = len(
+            train[
+                key
+            ]
         )
+
+        holdout_count = len(
+            holdout[
+                key
+            ]
+        )
+
+
+        try:
+
+            fit = (
+                core.robust_relative_rotation(
+                    train[key],
+                    seed=(
+                        81000
+                        + index
+                    ),
+                )
+            )
+
+
+        except Exception as exc:
+
+            residuals = []
+            suspect_mark_index = None
+
+
+            # Best-effort residuals เพื่อช่วยบอกว่า
+            # mark ไหนน่าสงสัยที่สุด
+            try:
+
+                rays_a = np.asarray(
+                    [
+                        obs["ray_a"]
+                        for obs
+                        in train[key]
+                    ],
+                    dtype=float,
+                )
+
+                rays_b = np.asarray(
+                    [
+                        obs["ray_b"]
+                        for obs
+                        in train[key]
+                    ],
+                    dtype=float,
+                )
+
+
+                if (
+                    len(rays_a) >= 2
+                    and
+                    len(rays_a)
+                    ==
+                    len(rays_b)
+                ):
+
+                    direct_R = (
+                        core.fit_rotation_b_to_a(
+                            rays_a,
+                            rays_b,
+                        )
+                    )
+
+                    direct_errors = (
+                        core.residual_angles_deg(
+                            direct_R,
+                            rays_a,
+                            rays_b,
+                        )
+                    )
+
+                    residuals = [
+                        float(value)
+                        for value
+                        in direct_errors
+                    ]
+
+
+                    if residuals:
+
+                        suspect_mark_index = (
+                            int(
+                                np.argmax(
+                                    direct_errors
+                                )
+                            )
+                            + 1
+                        )
+
+
+            except Exception:
+                # Diagnostic ต้องไม่บดบัง root cause เดิม
+                residuals = []
+                suspect_mark_index = None
+
+
+            failure = {
+                "pair":
+                    key,
+
+                "phase":
+                    "train",
+
+                "stage":
+                    "ransac",
+
+                "reason":
+                    str(
+                        exc
+                    ),
+
+                "train_count":
+                    int(
+                        train_count
+                    ),
+
+                "holdout_count":
+                    int(
+                        holdout_count
+                    ),
+
+                "train_residuals_deg":
+                    residuals,
+
+                "suspect_mark_index":
+                    suspect_mark_index,
+            }
+
+
+            hard_failures.append(
+                failure
+            )
+
+
+            results[
+                key
+            ] = {
+                "passed":
+                    False,
+
+                "hard_failure":
+                    True,
+
+                **failure,
+            }
+
+
+            print(
+                f"{key:>5} "
+                f"| train="
+                f"{train_count:3d} "
+                f"| holdout="
+                f"{holdout_count:3d} "
+                f"| FAIL "
+                f"| {exc}"
+            )
+
+
+            continue
 
 
         R = fit[
@@ -394,7 +553,20 @@ def evaluate_relative_rotation(
         )
 
 
-        results[key] = {
+        item = {
+            "pair":
+                key,
+
+            "train_count":
+                int(
+                    train_count
+                ),
+
+            "holdout_count":
+                int(
+                    holdout_count
+                ),
+
             "median_deg":
                 median,
 
@@ -411,12 +583,24 @@ def evaluate_relative_rotation(
         }
 
 
+        results[
+            key
+        ] = item
+
+
+        if not passed:
+
+            review_pairs.append(
+                item
+            )
+
+
         print(
             f"{key:>5} "
             f"| train="
-            f"{len(train[key]):3d} "
+            f"{train_count:3d} "
             f"| holdout="
-            f"{len(holdout[key]):3d} "
+            f"{holdout_count:3d} "
             f"| median="
             f"{median:7.3f}° "
             f"| p90="
@@ -425,6 +609,60 @@ def evaluate_relative_rotation(
             f"{maximum:7.3f}° "
             f"| "
             f"{'PASS' if passed else 'REVIEW'}"
+        )
+
+
+    # --------------------------------------------------------
+    # ถ้า Train RANSAC พังอย่างน้อยหนึ่ง Pair:
+    # ส่ง JSON marker ให้ Manager แสดงสาเหตุในหน้าเว็บ
+    # --------------------------------------------------------
+
+    if hard_failures:
+
+        diagnostic = {
+            "stage":
+                "pairwise_transfer_preflight",
+
+            "hard_failures":
+                hard_failures,
+
+            "review_pairs":
+                review_pairs,
+
+            "ransac_threshold_deg":
+                float(
+                    core.RANSAC_THRESHOLD_DEG
+                ),
+
+            "minimum_pair_inliers":
+                int(
+                    core.MIN_PAIR_INLIERS
+                ),
+        }
+
+
+        print(
+            "GEOMETRY_DIAGNOSTIC_JSON="
+            +
+            json.dumps(
+                diagnostic,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
+
+
+        raise RuntimeError(
+            "Geometry pair preflight failed: "
+            +
+            ", ".join(
+                item[
+                    "pair"
+                ]
+                for item
+                in hard_failures
+            )
         )
 
 
