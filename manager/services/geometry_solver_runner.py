@@ -7,6 +7,11 @@ import os
 import shutil
 import subprocess
 
+from datetime import (
+    datetime,
+    timezone,
+)
+
 from pathlib import Path
 
 
@@ -40,6 +45,23 @@ LOCK_FILE = (
     / ".manager"
     / "geometry_solver.lock"
 )
+
+
+FAILED_CANDIDATE_NAME = (
+    "preset_rotation_failed_"
+    "holdout_MIXED_AB_v3.json"
+)
+
+
+def _failed_geometry_candidate_path(
+    site_id,
+):
+
+    return candidate_path(
+        site_id,
+        "geometry_solver_workspace/"
+        + FAILED_CANDIDATE_NAME,
+    )
 
 
 def _sha256_file(
@@ -130,12 +152,21 @@ def _summary(
     candidate,
 ):
 
-    holdout = (
-        candidate
-        .get(
-            "post_refit_holdout",
-            {}
+    holdout_evaluation = (
+        candidate.get(
+            "post_refit_holdout"
         )
+        or
+        candidate.get(
+            "holdout_evaluation"
+        )
+        or
+        {}
+    )
+
+
+    holdout = (
+        holdout_evaluation
         .get(
             "global_metrics",
             {}
@@ -701,6 +732,597 @@ def _holdout_failure_user_message(
     )
 
 
+def failed_geometry_force_status(
+    site_id,
+):
+
+    state = load_state(
+        site_id
+    )
+
+
+    mode = str(
+        state.get(
+            "mode",
+            "LAB",
+        )
+        or "LAB"
+    ).upper()
+
+
+    failed_file = (
+        _failed_geometry_candidate_path(
+            site_id
+        )
+    )
+
+
+    manifest_file = (
+        candidate_path(
+            site_id,
+            "geometry_inputs/"
+            "manifest.json",
+        )
+    )
+
+
+    exists = (
+        failed_file.exists()
+    )
+
+
+    stale = False
+
+
+    if exists:
+
+        if not manifest_file.exists():
+
+            stale = True
+
+        else:
+
+            try:
+
+                stale = (
+                    failed_file.stat().st_mtime_ns
+                    <
+                    manifest_file.stat().st_mtime_ns
+                )
+
+            except OSError:
+
+                stale = True
+
+
+    candidate = None
+
+
+    if (
+        exists
+        and
+        not stale
+    ):
+
+        try:
+
+            candidate = (
+                _read_json(
+                    failed_file
+                )
+            )
+
+        except Exception:
+
+            candidate = None
+
+
+    gate = (
+        (
+            candidate
+            or {}
+        )
+        .get(
+            "independent_holdout_gate",
+            {},
+        )
+        or {}
+    )
+
+
+    presets = (
+        (
+            candidate
+            or {}
+        )
+        .get(
+            "presets"
+        )
+    )
+
+
+    structurally_valid = bool(
+        isinstance(
+            candidate,
+            dict,
+        )
+
+        and
+
+        candidate.get(
+            "status"
+        )
+        ==
+        "HOLDOUT_FAILED_CANDIDATE_NOT_INSTALLED"
+
+        and
+
+        candidate.get(
+            "model"
+        )
+        ==
+        "calibrated-global-raw-ray-rotation"
+
+        and
+
+        gate.get(
+            "passed"
+        )
+        is False
+
+        and
+
+        isinstance(
+            presets,
+            dict,
+        )
+
+        and
+
+        all(
+            str(preset)
+            in presets
+
+            for preset
+            in range(
+                1,
+                10,
+            )
+        )
+    )
+
+
+    available = bool(
+        exists
+        and
+        not stale
+        and
+        structurally_valid
+    )
+
+
+    pair_checks = (
+        gate.get(
+            "pairs",
+            {},
+        )
+        or {}
+    )
+
+
+    failed_pairs = [
+        pair
+        for pair, passed
+        in pair_checks.items()
+        if passed is not True
+    ]
+
+
+    holdout_metrics = (
+        (
+            candidate
+            or {}
+        )
+        .get(
+            "holdout_evaluation",
+            {},
+        )
+        .get(
+            "global_metrics",
+            {},
+        )
+        or {}
+    )
+
+
+    return {
+        "ok":
+            True,
+
+        "site_id":
+            site_id,
+
+        "mode":
+            mode,
+
+        "available":
+            available,
+
+        # Force override is intentionally LAB-only.
+        "allowed":
+            bool(
+                available
+                and
+                mode
+                ==
+                "LAB"
+            ),
+
+        "stale":
+            bool(
+                stale
+            ),
+
+        "failed_pairs":
+            failed_pairs,
+
+        "global_metrics":
+            holdout_metrics,
+
+        "reason":
+            (
+                None
+                if (
+                    available
+                    and
+                    mode
+                    ==
+                    "LAB"
+                )
+                else
+                (
+                    "force_override_lab_only"
+                    if (
+                        available
+                        and
+                        mode
+                        !=
+                        "LAB"
+                    )
+                    else
+                    (
+                        "failed_candidate_stale"
+                        if stale
+                        else
+                        "no_current_failed_candidate"
+                    )
+                )
+            ),
+
+        "runtime_changed":
+            False,
+    }
+
+
+def force_failed_geometry_candidate(
+    site_id,
+    *,
+    confirmation,
+    reason=None,
+):
+
+    status = (
+        failed_geometry_force_status(
+            site_id
+        )
+    )
+
+
+    if (
+        str(
+            confirmation
+            or ""
+        )
+        .strip()
+        .upper()
+        !=
+        "FORCE"
+    ):
+
+        raise ValueError(
+            "confirmation must be FORCE"
+        )
+
+
+    if not status.get(
+        "allowed"
+    ):
+
+        raise RuntimeError(
+            status.get(
+                "reason"
+            )
+            or
+            "force_override_not_allowed"
+        )
+
+
+    failed_file = (
+        _failed_geometry_candidate_path(
+            site_id
+        )
+    )
+
+
+    candidate = (
+        _read_json(
+            failed_file
+        )
+    )
+
+
+    gate = (
+        candidate.get(
+            "independent_holdout_gate",
+            {},
+        )
+        or {}
+    )
+
+
+    if (
+        gate.get(
+            "passed"
+        )
+        is not False
+    ):
+
+        raise RuntimeError(
+            "failed candidate does not "
+            "contain a failed holdout gate"
+        )
+
+
+    forced_at = (
+        datetime.now(
+            timezone.utc
+        )
+        .isoformat()
+    )
+
+
+    reason_text = str(
+        reason
+        or
+        "manual_operator_override"
+    ).strip()
+
+
+    if not reason_text:
+
+        reason_text = (
+            "manual_operator_override"
+        )
+
+
+    reason_text = (
+        reason_text[
+            :300
+        ]
+    )
+
+
+    forced = dict(
+        candidate
+    )
+
+
+    forced[
+        "status"
+    ] = (
+        "FORCED_CANDIDATE_NOT_INSTALLED"
+    )
+
+
+    forced[
+        "operator_override"
+    ] = {
+        "enabled":
+            True,
+
+        "acknowledged_holdout_failure":
+            True,
+
+        "scope":
+            "LAB",
+
+        "forced_at_utc":
+            forced_at,
+
+        "reason":
+            reason_text,
+
+        "source_status":
+            candidate.get(
+                "status"
+            ),
+
+        "source_failed_candidate":
+            str(
+                failed_file
+            ),
+    }
+
+
+    manager_candidate = (
+        save_candidate(
+            site_id,
+            "preset_rotation.json",
+            forced,
+        )
+    )
+
+
+    intrinsics_file = (
+        candidate_path(
+            site_id,
+            "camera_intrinsics.json",
+        )
+    )
+
+
+    intrinsics_sha256 = (
+        _sha256_file(
+            intrinsics_file
+        )
+        if intrinsics_file.exists()
+        else None
+    )
+
+
+    state = load_state(
+        site_id
+    )
+
+
+    geometry = (
+        state.setdefault(
+            "geometry",
+            {},
+        )
+    )
+
+
+    geometry[
+        "candidate"
+    ] = forced
+
+
+    geometry[
+        "solver_result"
+    ] = {
+        "engine":
+            "solve_final_mixed_"
+            "rotation_AB_v3.py",
+
+        "candidate_file":
+            str(
+                manager_candidate
+            ),
+
+        "workspace":
+            str(
+                failed_file.parent
+            ),
+
+        "passed":
+            False,
+
+        "forced_override":
+            True,
+
+        "holdout_passed":
+            False,
+
+        "source_failed_candidate":
+            str(
+                failed_file
+            ),
+
+        "intrinsics_file":
+            str(
+                intrinsics_file
+            ),
+
+        "intrinsics_sha256":
+            intrinsics_sha256,
+    }
+
+
+    geometry[
+        "override"
+    ] = {
+        "enabled":
+            True,
+
+        "forced_at_utc":
+            forced_at,
+
+        "reason":
+            reason_text,
+
+        "failed_pairs":
+            status.get(
+                "failed_pairs",
+                [],
+            ),
+
+        "global_metrics":
+            status.get(
+                "global_metrics",
+                {},
+            ),
+    }
+
+
+    state[
+        "step"
+    ] = "TRUE_NORTH"
+
+
+    save_state(
+        site_id,
+        state,
+    )
+
+
+    return {
+        "ok":
+            True,
+
+        "site_id":
+            site_id,
+
+        "status":
+            forced[
+                "status"
+            ],
+
+        "forced_override":
+            True,
+
+        "holdout_passed":
+            False,
+
+        "failed_pairs":
+            status.get(
+                "failed_pairs",
+                [],
+            ),
+
+        "global_metrics":
+            status.get(
+                "global_metrics",
+                {},
+            ),
+
+        "candidate_file":
+            str(
+                manager_candidate
+            ),
+
+        "warning":
+            (
+                "Geometry นี้ไม่ผ่าน Independent "
+                "Holdout และถูกเปิดใช้ด้วย "
+                "LAB operator override"
+            ),
+
+        "runtime_changed":
+            False,
+    }
+
+
 def run_existing_geometry_solver(
     site_id,
 ):
@@ -911,6 +1533,12 @@ def run_existing_geometry_solver(
         / "preset_rotation_candidate_MIXED_AB_v3.json"
     )
 
+    failed_candidate_file = (
+        workspace
+        / FAILED_CANDIDATE_NAME
+    )
+
+
     stdout_file = (
         workspace
         / "solver.stdout.txt"
@@ -928,6 +1556,7 @@ def run_existing_geometry_solver(
         holdout_file,
         result_file,
         candidate_file,
+        failed_candidate_file,
     ):
 
         try:
@@ -1036,6 +1665,13 @@ def run_existing_geometry_solver(
         "SMART_FIRE_MIXED_FINAL_CANDIDATE"
     ] = str(
         candidate_file
+    )
+
+
+    env[
+        "SMART_FIRE_MIXED_FAILED_CANDIDATE"
+    ] = str(
+        failed_candidate_file
     )
 
 

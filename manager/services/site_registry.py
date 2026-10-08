@@ -233,28 +233,113 @@ def _default_components(
 def _rotation_validation_state(
     raw_status: str | None,
 ) -> str:
+    value = (raw_status or "").upper()
 
-    value = (
-        raw_status or ""
-    ).upper()
-
-    if "CANDIDATE" in value:
-        return "CANDIDATE"
+    if "FORCED" in value:
+        return "FORCED"
 
     if (
-        "VALIDATED" in value
+        value == "ACTIVE"
+        or value.startswith("PASS_")
+        or "VALIDATED" in value
         or value == "PASS"
     ):
         return "VALIDATED"
 
+    if "CANDIDATE" in value:
+        return "CANDIDATE"
+
     return "UNKNOWN"
 
 
-def list_registered_sites() -> dict:
+def _overlay_runtime_state(registry: dict) -> dict:
+    active = get_active_site()
+    calibration = get_calibration_status()
 
-    registry = _with_registry()
+    active_id = active.get("site_id")
+    active_revision = active.get("revision_id")
+    sites = registry.get("sites", {})
+
+    for site_id, site in sites.items():
+        is_active = bool(active_id and site_id == active_id)
+        site["runtime_active"] = is_active
+
+        if is_active:
+            site["lifecycle"] = "ACTIVE"
+            site["site_dir"] = active.get("site_dir")
+            site["active_revision_id"] = active_revision
+
+            rotation = calibration.get("rotation", {}) or {}
+            distance = calibration.get("distance", {}) or {}
+
+            raw_status = (
+                rotation.get("artifact_status")
+                or rotation.get("status")
+            )
+
+            site["rotation_metadata_status"] = raw_status
+            site["validation_state"] = _rotation_validation_state(
+                raw_status
+            )
+
+            components = (
+                site.get("components")
+                or _default_components(site.get("mode", "LAB"))
+            )
+
+            if rotation.get("loaded"):
+                components["preset_geometry"] = (
+                    "FORCED_ACTIVE"
+                    if rotation.get("forced")
+                    else "ACTIVE"
+                )
+                components["cross_preset"] = "ACTIVE"
+
+            if distance.get("loaded"):
+                components["distance"] = "CALIBRATED_UNVERIFIED"
+
+            site["components"] = components
+
+            warnings = list(site.get("warnings") or [])
+            warning = (
+                "Active runtime uses FORCED geometry; "
+                "independent holdout did not pass."
+            )
+            if rotation.get("forced") and warning not in warnings:
+                warnings.append(warning)
+            site["warnings"] = warnings
+
+        else:
+            site.pop("active_revision_id", None)
+
+            if str(site.get("lifecycle", "")).upper() == "ACTIVE":
+                site["lifecycle"] = (
+                    "DRAFT"
+                    if site.get("validation_state") == "DRAFT"
+                    else "INACTIVE"
+                )
 
     return registry
+
+
+def list_registered_sites() -> dict:
+    registry = _with_registry()
+    return _overlay_runtime_state(registry)
+
+
+def reconcile_active_runtime() -> dict:
+    def mutate(registry: dict):
+        return _overlay_runtime_state(registry)
+
+    registry = _with_registry(mutate)
+    active = get_active_site()
+
+    return {
+        "ok": True,
+        "active_site": active.get("site_id"),
+        "active_revision": active.get("revision_id"),
+        "registry": registry,
+    }
 
 
 def adopt_current_site(

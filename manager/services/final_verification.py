@@ -1190,15 +1190,90 @@ def verify_site_candidate(
     geometry_data = None
 
 
+    override_meta = (
+        (
+            geometry_candidate
+            or {}
+        )
+        .get(
+            "operator_override",
+            {},
+        )
+        or {}
+    )
+
+
+    geometry_gate = (
+        (
+            geometry_candidate
+            or {}
+        )
+        .get(
+            "independent_holdout_gate",
+            {},
+        )
+        or {}
+    )
+
+
+    forced_geometry = bool(
+        (
+            geometry_candidate
+            or {}
+        ).get(
+            "status"
+        )
+        ==
+        "FORCED_CANDIDATE_NOT_INSTALLED"
+
+        and
+
+        override_meta.get(
+            "enabled"
+        )
+        is True
+
+        and
+
+        override_meta.get(
+            "acknowledged_holdout_failure"
+        )
+        is True
+
+        and
+
+        geometry_gate.get(
+            "passed"
+        )
+        is False
+
+        and
+
+        solver_result.get(
+            "forced_override"
+        )
+        is True
+    )
+
+
+    solver_geometry_accepted = bool(
+        solver_result.get(
+            "passed"
+        )
+        is True
+
+        or
+
+        forced_geometry
+    )
+
+
     if (
         _valid_geometry(
             geometry_candidate
         )
         and
-        solver_result.get(
-            "passed"
-        )
-        is True
+        solver_geometry_accepted
     ):
 
         geometry_source = (
@@ -1231,6 +1306,15 @@ def verify_site_candidate(
         )
 
 
+    geometry_is_forced = bool(
+        geometry_source
+        ==
+        "candidate"
+        and
+        forced_geometry
+    )
+
+
     add(
         "geometry",
         "Cross-Preset Geometry",
@@ -1241,14 +1325,28 @@ def verify_site_candidate(
             geometry_data
         ),
 
+        status=(
+            "WARN"
+            if geometry_is_forced
+            else None
+        ),
+
         detail=(
             (
-                "Geometry พร้อม | "
-                f"{geometry_source}"
+                "Geometry พร้อมแบบ FORCED LAB OVERRIDE | "
+                "Independent Holdout = FAILED"
             )
-            if geometry_data
+            if geometry_is_forced
             else
-            "ยังไม่มี Geometry ที่ผ่าน Solver"
+            (
+                (
+                    "Geometry พร้อม | "
+                    f"{geometry_source}"
+                )
+                if geometry_data
+                else
+                "ยังไม่มี Geometry ที่ผ่าน Solver"
+            )
         ),
 
         source=

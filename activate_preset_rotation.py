@@ -223,6 +223,15 @@ def main():
             ).get("passed")
             is True
         ),
+        "forced_override": (
+            metadata.get(
+                "operator_override",
+                {},
+            ).get(
+                "enabled"
+            )
+            is True
+        ),
     }
 
     meta_tmp = ACTIVE_META.with_suffix(

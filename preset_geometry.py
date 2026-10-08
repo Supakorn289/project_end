@@ -214,28 +214,88 @@ class PresetRotationRuntime:
             )
         )
 
-        if not status.startswith(
-            "PASS_"
-        ):
-            raise RuntimeError(
-                "Preset rotation is not "
-                f"a PASS artifact: {status}"
-            )
-
         gate = payload.get(
             "independent_holdout_gate",
             {},
         )
 
-        if (
-            not isinstance(gate, dict)
+
+        override = (
+            payload.get(
+                "operator_override",
+                {},
+            )
+            or {}
+        )
+
+
+        pass_artifact = bool(
+            status.startswith(
+                "PASS_"
+            )
+
+            and
+
+            isinstance(
+                gate,
+                dict,
+            )
+
+            and
+
+            gate.get(
+                "passed"
+            )
+            is True
+        )
+
+
+        forced_artifact = bool(
+            status
+            ==
+            "FORCED_CANDIDATE_NOT_INSTALLED"
+
+            and
+
+            isinstance(
+                gate,
+                dict,
+            )
+
+            and
+
+            gate.get(
+                "passed"
+            )
+            is False
+
+            and
+
+            override.get(
+                "enabled"
+            )
+            is True
+
+            and
+
+            override.get(
+                "acknowledged_holdout_failure"
+            )
+            is True
+        )
+
+
+        if not (
+            pass_artifact
             or
-            gate.get("passed")
-            is not True
+            forced_artifact
         ):
+
             raise RuntimeError(
-                "Independent holdout gate "
-                "is not PASS"
+                "Preset rotation is neither "
+                "a validated PASS artifact nor "
+                "an explicit FORCED override: "
+                f"{status}"
             )
 
         presets = payload.get(

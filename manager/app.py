@@ -52,7 +52,14 @@ from manager.activation_api import activation_bp
 from manager.wizard_api import wizard_bp
 
 
+from manager.runtime_site_api import runtime_site_bp
+
 app = Flask(__name__)
+
+app.register_blueprint(
+    runtime_site_bp
+)
+
 
 configure_session_security(
     app

@@ -976,6 +976,20 @@ small{color:var(--muted)}
         >
             คำนวณ Geometry ด้วย Solver เดิม
         </button>
+
+        <button
+            id="btnForceGeometry"
+            class="red hidden"
+        >
+            ⚠ ใช้ Geometry นี้แบบ Override (LAB)
+        </button>
+    </div>
+
+    <div
+        id="geometryForceStatus"
+        class="status warn hidden"
+    >
+        —
     </div>
 </section>
 
@@ -1327,11 +1341,16 @@ async function api(
                 .classList.remove("hidden");
         }
 
-        throw new Error(
-            data.user_message
-            || data.error
-            || JSON.stringify(data)
-        );
+        const err =
+            new Error(
+                data.user_message
+                || data.error
+                || JSON.stringify(data)
+            );
+
+        err.payload = data;
+
+        throw err;
     }
 
     return data;
@@ -3056,6 +3075,8 @@ async()=>{
             +
             "Runtime changed: false";
 
+        hideGeometryForceOverride();
+
 
     }catch(error){
 
@@ -3070,6 +3091,294 @@ async()=>{
     }
 };
 
+
+
+function hideGeometryForceOverride(){
+
+    const button =
+        document.getElementById(
+            "btnForceGeometry"
+        );
+
+    const status =
+        document.getElementById(
+            "geometryForceStatus"
+        );
+
+
+    if(button){
+        button.classList.add(
+            "hidden"
+        );
+    }
+
+
+    if(status){
+        status.classList.add(
+            "hidden"
+        );
+    }
+}
+
+
+async function refreshGeometryForceStatus(){
+
+    if(!siteId){
+        hideGeometryForceOverride();
+        return null;
+    }
+
+
+    const button =
+        document.getElementById(
+            "btnForceGeometry"
+        );
+
+    const statusBox =
+        document.getElementById(
+            "geometryForceStatus"
+        );
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/geometry-adapter/${siteId}/force-status`
+            );
+
+
+        if(
+            data.available
+            &&
+            data.allowed
+        ){
+
+            button
+                .classList
+                .remove(
+                    "hidden"
+                );
+
+
+            statusBox
+                .classList
+                .remove(
+                    "hidden"
+                );
+
+
+            const pairs =
+                (
+                    data.failed_pairs
+                    || []
+                )
+                .join(", ");
+
+
+            const g =
+                data.global_metrics
+                || {};
+
+
+            statusBox.textContent =
+                "⚠ FORCED OVERRIDE AVAILABLE\n"
+                +
+                "Independent Holdout = FAILED\n"
+                +
+                `Failed pairs: ${pairs || "unknown"}\n`
+                +
+                (
+                    g.median_abs_azimuth_error_deg
+                    != null
+                    ?
+                    `Global median: ${
+                        Number(
+                            g.median_abs_azimuth_error_deg
+                        ).toFixed(3)
+                    }°\n`
+                    :
+                    ""
+                )
+                +
+                (
+                    g.p90_abs_azimuth_error_deg
+                    != null
+                    ?
+                    `Global P90: ${
+                        Number(
+                            g.p90_abs_azimuth_error_deg
+                        ).toFixed(3)
+                    }°\n`
+                    :
+                    ""
+                )
+                +
+                "\nLAB เท่านั้น · Runtime ยังไม่ถูกเปลี่ยน";
+
+
+            return data;
+        }
+
+
+        hideGeometryForceOverride();
+
+        return data;
+
+
+    }catch(error){
+
+        hideGeometryForceOverride();
+
+        return null;
+    }
+}
+
+
+document
+    .getElementById(
+        "btnForceGeometry"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const confirmation =
+        prompt(
+            "Geometry นี้ไม่ผ่าน Independent Holdout\n\n"
+            +
+            "การ Override อาจทำให้ Bearing/พิกัดคลาดเคลื่อน\n"
+            +
+            "โหมดนี้อนุญาตเฉพาะ LAB\n\n"
+            +
+            "พิมพ์ FORCE เพื่อยืนยัน"
+        );
+
+
+    if(
+        String(
+            confirmation
+            || ""
+        )
+        .trim()
+        .toUpperCase()
+        !==
+        "FORCE"
+    ){
+        return;
+    }
+
+
+    const reason =
+        prompt(
+            "เหตุผลในการ Override (ไม่บังคับ)",
+            "temporary_lab_override"
+        );
+
+
+    const box =
+        document.getElementById(
+            "geometryStatus"
+        );
+
+
+    box.textContent =
+        "กำลังสร้าง FORCED Geometry Candidate...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/geometry-adapter/${siteId}/force`,
+                {
+                    method:"POST",
+
+                    body:
+                        JSON.stringify({
+                            confirmation:
+                                "FORCE",
+
+                            reason:
+                                (
+                                    reason
+                                    ||
+                                    "temporary_lab_override"
+                                )
+                        }),
+                }
+            );
+
+
+        box.textContent =
+            "⚠ FORCED GEOMETRY CANDIDATE CREATED\n"
+            +
+            `Status: ${data.status}\n`
+            +
+            "Holdout passed: false\n"
+            +
+            `Failed pairs: ${
+                (
+                    data.failed_pairs
+                    || []
+                ).join(", ")
+            }\n\n`
+            +
+            "ยังไม่เปลี่ยน Active Runtime\n"
+            +
+            "ไปทำ True North / Final Verification / Revision / Activate ต่อ";
+
+
+        const statusBox =
+            document.getElementById(
+                "geometryForceStatus"
+            );
+
+
+        statusBox.textContent =
+            "⚠ Geometry Candidate นี้ถูกสร้างด้วย LAB operator override\n"
+            +
+            "Independent Holdout = FAILED";
+
+        statusBox
+            .classList
+            .remove(
+                "hidden"
+            );
+
+
+        document
+            .getElementById(
+                "btnForceGeometry"
+            )
+            .classList
+            .add(
+                "hidden"
+            );
+
+
+        const state =
+            await api(
+                `/api/wizard/state/${siteId}`
+            );
+
+
+        wizardState =
+            state.state;
+
+
+    }catch(error){
+
+        box.textContent =
+            String(
+                error
+            );
+    }
+};
 
 
 document
@@ -3129,6 +3438,8 @@ async()=>{
                 2
             );
 
+        hideGeometryForceOverride();
+
 
     }catch(error){
 
@@ -3136,6 +3447,8 @@ async()=>{
             String(
                 error
             );
+
+        await refreshGeometryForceStatus();
     }
 };
 
@@ -3718,6 +4031,8 @@ async()=>{
             `HFOV: ${data.summary.effective_hfov_deg}\n`
             +
             "Runtime changed: false";
+
+        hideGeometryForceOverride();
 
 
     }catch(error){

@@ -2717,10 +2717,22 @@ def _deploy_revision(
                 )
 
 
+                # Runtime calibration artifacts contain
+                # no credentials. Detection runs as smartfire,
+                # so they must remain readable after deployment.
                 os.chmod(
                     dst,
-                    0o640,
+                    0o644,
                 )
+
+
+            # tempfile.mkdtemp() creates mode 0700.
+            # The Detection runtime runs as smartfire and
+            # must be able to traverse this immutable revision.
+            os.chmod(
+                stage,
+                0o755,
+            )
 
 
             os.replace(
