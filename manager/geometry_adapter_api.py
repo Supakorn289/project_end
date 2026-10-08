@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import (
     Blueprint,
     jsonify,
+    request,
 )
 
 from manager.security import (
@@ -268,6 +269,108 @@ def geometry_adapter_solve(
                 f"{type(exc).__name__}: "
                 f"{exc}"
             ),
+
+            "runtime_changed":
+                False,
+        }), 400
+
+@geometry_adapter_bp.get(
+    "/api/geometry-adapter/"
+    "<site_id>/force-status"
+)
+@require_manager_session
+def geometry_adapter_force_status(
+    site_id,
+):
+
+    from manager.services.geometry_solver_runner import (
+        failed_geometry_force_status,
+    )
+
+
+    try:
+
+        return jsonify(
+            failed_geometry_force_status(
+                site_id
+            )
+        )
+
+
+    except Exception as exc:
+
+        return jsonify({
+            "ok":
+                False,
+
+            "error":
+                (
+                    f"{type(exc).__name__}: "
+                    f"{exc}"
+                ),
+
+            "runtime_changed":
+                False,
+        }), 400
+
+
+@geometry_adapter_bp.post(
+    "/api/geometry-adapter/"
+    "<site_id>/force"
+)
+@require_manager_session
+def geometry_adapter_force(
+    site_id,
+):
+
+    from manager.services.geometry_solver_runner import (
+        force_failed_geometry_candidate,
+    )
+
+
+    try:
+
+        data = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+
+        result = (
+            force_failed_geometry_candidate(
+                site_id,
+
+                confirmation=
+                    data.get(
+                        "confirmation"
+                    ),
+
+                reason=
+                    data.get(
+                        "reason"
+                    ),
+            )
+        )
+
+
+        return jsonify(
+            result
+        )
+
+
+    except Exception as exc:
+
+        return jsonify({
+            "ok":
+                False,
+
+            "error":
+                (
+                    f"{type(exc).__name__}: "
+                    f"{exc}"
+                ),
 
             "runtime_changed":
                 False,

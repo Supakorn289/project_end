@@ -210,13 +210,17 @@ small{color:var(--muted)}
 
     <div class="steps">
         <div class="step active">1 · Site</div>
-        <div class="step">2 · Device</div>
-        <div class="step">3 · PTZ Capture</div>
-        <div class="step">4 · Distance</div>
-        <div class="step">5 · Verify Distance</div>
-        <div class="step">6 · Cross-Preset</div>
-        <div class="step">7 · True North</div>
-        <div class="step">8 · Final Verify</div>
+        <div class="step">2 · Device / Camera</div>
+        <div class="step">3 · Camera Intrinsics</div>
+        <div class="step">4 · PTZ Presets & Capture</div>
+        <div class="step">5 · Distance Calibration</div>
+        <div class="step">6 · Distance Verification</div>
+        <div class="step">7 · Cross-Preset Geometry</div>
+        <div class="step">8 · True North</div>
+        <div class="step">9 · GPS / Location</div>
+        <div class="step">10 · Telegram</div>
+        <div class="step">11 · Final Verification</div>
+        <div class="step">12 · Revision & Activation</div>
     </div>
 </aside>
 
@@ -280,7 +284,7 @@ small{color:var(--muted)}
         class="hidden"
     >
         <label>
-            Existing Site
+            Site ที่มีอยู่
             <select id="existingSite"></select>
         </label>
 
@@ -327,7 +331,7 @@ small{color:var(--muted)}
         >
 
             <button id="btnUseExisting">
-                ใช้พื้นที่นี้
+                เปิด / ดำเนินการต่อ
             </button>
 
             <button
@@ -617,6 +621,15 @@ small{color:var(--muted)}
 
 
     <div
+        id="intrinsicsStatus"
+        class="status"
+        style="margin-top:14px"
+    >
+        ยังไม่ได้เลือก Intrinsics
+    </div>
+
+
+    <div
         style="
             margin-top:18px;
             padding-top:18px;
@@ -691,14 +704,6 @@ small{color:var(--muted)}
 
         </div>
 
-    </div>
-
-
-    <div
-        id="intrinsicsStatus"
-        class="status"
-    >
-        ยังไม่ได้เลือก Intrinsics
     </div>
 
 
@@ -971,6 +976,20 @@ small{color:var(--muted)}
         >
             คำนวณ Geometry ด้วย Solver เดิม
         </button>
+
+        <button
+            id="btnForceGeometry"
+            class="red hidden"
+        >
+            ⚠ ใช้ Geometry นี้แบบ Override (LAB)
+        </button>
+    </div>
+
+    <div
+        id="geometryForceStatus"
+        class="status warn hidden"
+    >
+        —
     </div>
 </section>
 
@@ -1285,6 +1304,10 @@ const entryMode =
     qs.get("mode")
     || "existing";
 
+const requestedSiteId =
+    qs.get("site")
+    || "";
+
 
 async function api(
     url,
@@ -1318,10 +1341,16 @@ async function api(
                 .classList.remove("hidden");
         }
 
-        throw new Error(
-            data.error
-            || JSON.stringify(data)
-        );
+        const err =
+            new Error(
+                data.user_message
+                || data.error
+                || JSON.stringify(data)
+            );
+
+        err.payload = data;
+
+        throw err;
     }
 
     return data;
@@ -1540,6 +1569,19 @@ async function loadSites(){
     }
 
 
+    if(
+        requestedSiteId
+        &&
+        Object.prototype.hasOwnProperty.call(
+            sites,
+            requestedSiteId
+        )
+    ){
+        select.value =
+            requestedSiteId;
+    }
+
+
     fillExistingLocationForm();
 
 
@@ -1668,6 +1710,12 @@ async()=>{
         .textContent =
         `Using ${siteId} · ${wizardState.mode}`;
 
+    history.replaceState(
+        null,
+        "",
+        `/setup-wizard?mode=existing&site=${encodeURIComponent(siteId)}`
+    );
+
     showAfterSite();
     restoreCaptures();
 };
@@ -1678,6 +1726,44 @@ document
     .onclick =
 async()=>{
     try{
+        const requestedId =
+            document
+            .getElementById("newSiteId")
+            .value
+            .trim();
+
+        if(!requestedId){
+            document
+                .getElementById("siteStatus")
+                .textContent =
+                "กรุณากรอก Site ID";
+            return;
+        }
+
+        const registry =
+            await api(
+                "/api/wizard/sites"
+            );
+
+        if(
+            registry.sites
+            &&
+            Object.prototype.hasOwnProperty.call(
+                registry.sites,
+                requestedId
+            )
+        ){
+            document
+                .getElementById("siteStatus")
+                .textContent =
+                `Site ${requestedId} มีอยู่แล้ว — กำลังเปิดเพื่อดำเนินการต่อ`;
+
+            window.location.assign(
+                `/setup-wizard?mode=existing&site=${encodeURIComponent(requestedId)}`
+            );
+            return;
+        }
+
         const data =
             await api(
                 "/api/wizard/site/new",
@@ -1782,6 +1868,12 @@ async()=>{
                 ? ` · ${location.installation_location}`
                 : ""
             );
+
+        history.replaceState(
+            null,
+            "",
+            `/setup-wizard?mode=existing&site=${encodeURIComponent(siteId)}`
+        );
 
         showAfterSite();
 
@@ -2412,26 +2504,91 @@ function geometryPairParts(){
 }
 
 
-function loadGeometryPair(){
-
-    if(!wizardState)return;
-
-    const [a,b] =
-        geometryPairParts();
+function geometryPhaseInfo(){
 
     const phase =
         document
         .getElementById("geometryPhase")
         .value;
 
+    const key =
+        phase === "train"
+        ? "main"
+        : "holdout";
+
     const captures =
-        wizardState
-        .captures[
-            phase === "train"
-            ? "main"
-            : "holdout"
-        ]
+        (
+            wizardState
+            &&
+            wizardState.captures
+            &&
+            wizardState.captures[key]
+        )
         || {};
+
+    return {
+        phase,
+        key,
+        captures,
+    };
+}
+
+
+function clearGeometryCanvas(
+    canvas,
+    message
+){
+
+    const width = 1280;
+    const height = 720;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx =
+        canvas.getContext("2d");
+
+    ctx.fillStyle = "#0b1320";
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+    ctx.fillStyle = "#9fb3c8";
+    ctx.font = "28px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(
+        message,
+        width / 2,
+        height / 2
+    );
+}
+
+
+function loadGeometryPair(){
+
+    if(!wizardState){
+        return;
+    }
+
+    const [a,b] =
+        geometryPairParts();
+
+    const info =
+        geometryPhaseInfo();
+
+    const captures =
+        info.captures;
+
+    const captureA =
+        captures[String(a)];
+
+    const captureB =
+        captures[String(b)];
 
     document
         .getElementById("pairLabelA")
@@ -2446,20 +2603,87 @@ function loadGeometryPair(){
     geometryClickA = null;
     geometryClickB = null;
 
-    if(captures[String(a)]){
+    const canvasA =
+        document
+        .getElementById("geometryA");
+
+    const canvasB =
+        document
+        .getElementById("geometryB");
+
+    if(captureA){
+
         drawImageOnCanvas(
-            document
-            .getElementById("geometryA"),
-            captures[String(a)].relative_url
+            canvasA,
+            captureA.relative_url
+        );
+
+    }else{
+
+        clearGeometryCanvas(
+            canvasA,
+            `ไม่มี ${info.phase.toUpperCase()} capture ของ P${a}`
         );
     }
 
-    if(captures[String(b)]){
+    if(captureB){
+
         drawImageOnCanvas(
-            document
-            .getElementById("geometryB"),
-            captures[String(b)].relative_url
+            canvasB,
+            captureB.relative_url
         );
+
+    }else{
+
+        clearGeometryCanvas(
+            canvasB,
+            `ไม่มี ${info.phase.toUpperCase()} capture ของ P${b}`
+        );
+    }
+
+    const missing = [];
+
+    if(!captureA){
+        missing.push(`P${a}`);
+    }
+
+    if(!captureB){
+        missing.push(`P${b}`);
+    }
+
+    const saveButton =
+        document
+        .getElementById("btnSaveMark");
+
+    if(missing.length){
+
+        saveButton.disabled = true;
+
+        document
+            .getElementById("geometryStatus")
+            .textContent =
+            `${info.phase.toUpperCase()} capture ไม่ครบ: `
+            +
+            missing.join(", ")
+            +
+            "\nกลับไป Step 4 เลือก "
+            +
+            "\"Verification / Holdout\" "
+            +
+            "แล้ว Capture preset ที่ขาด";
+
+    }else{
+
+        saveButton.disabled = false;
+
+        document
+            .getElementById("geometryStatus")
+            .textContent =
+            `${info.phase.toUpperCase()} · Pair ${a}-${b}\n`
+            +
+            "คลิกจุดเดียวกันในภาพ A และ B "
+            +
+            "แล้วกด บันทึก Landmark";
     }
 }
 
@@ -2468,6 +2692,7 @@ document
     .getElementById("geometryPair")
     .onchange =
     loadGeometryPair;
+
 
 document
     .getElementById("geometryPhase")
@@ -2479,34 +2704,46 @@ document
     .getElementById("geometryA")
     .onclick =
 event=>{
+
+    const info =
+        geometryPhaseInfo();
+
+    const [a] =
+        geometryPairParts();
+
+    const capture =
+        info.captures[String(a)];
+
+    if(!capture){
+
+        document
+            .getElementById("geometryStatus")
+            .textContent =
+            `ไม่มี ${info.phase.toUpperCase()} capture ของ P${a}`;
+
+        return;
+    }
+
     geometryClickA =
         canvasPoint(
             event.currentTarget,
             event
         );
 
-    const phase =
-        document
-        .getElementById("geometryPhase")
-        .value;
+    drawImageOnCanvas(
+        event.currentTarget,
+        capture.relative_url,
+        geometryClickA
+    );
 
-    const [a] =
-        geometryPairParts();
-
-    const captures =
-        wizardState.captures[
-            phase === "train"
-            ? "main"
-            : "holdout"
-        ];
-
-    if(captures[String(a)]){
-        drawImageOnCanvas(
-            event.currentTarget,
-            captures[String(a)].relative_url,
-            geometryClickA
-        );
-    }
+    document
+        .getElementById("geometryStatus")
+        .textContent =
+        `เลือกจุด P${a} แล้ว · `
+        +
+        `x=${geometryClickA.x.toFixed(1)} `
+        +
+        `y=${geometryClickA.y.toFixed(1)}`;
 };
 
 
@@ -2514,34 +2751,46 @@ document
     .getElementById("geometryB")
     .onclick =
 event=>{
+
+    const info =
+        geometryPhaseInfo();
+
+    const [,b] =
+        geometryPairParts();
+
+    const capture =
+        info.captures[String(b)];
+
+    if(!capture){
+
+        document
+            .getElementById("geometryStatus")
+            .textContent =
+            `ไม่มี ${info.phase.toUpperCase()} capture ของ P${b}`;
+
+        return;
+    }
+
     geometryClickB =
         canvasPoint(
             event.currentTarget,
             event
         );
 
-    const phase =
-        document
-        .getElementById("geometryPhase")
-        .value;
+    drawImageOnCanvas(
+        event.currentTarget,
+        capture.relative_url,
+        geometryClickB
+    );
 
-    const [,b] =
-        geometryPairParts();
-
-    const captures =
-        wizardState.captures[
-            phase === "train"
-            ? "main"
-            : "holdout"
-        ];
-
-    if(captures[String(b)]){
-        drawImageOnCanvas(
-            event.currentTarget,
-            captures[String(b)].relative_url,
-            geometryClickB
-        );
-    }
+    document
+        .getElementById("geometryStatus")
+        .textContent =
+        `เลือกจุด P${b} แล้ว · `
+        +
+        `x=${geometryClickB.x.toFixed(1)} `
+        +
+        `y=${geometryClickB.y.toFixed(1)}`;
 };
 
 
@@ -2549,59 +2798,93 @@ document
     .getElementById("btnSaveMark")
     .onclick =
 async()=>{
-    if(
-        !siteId
-        || !geometryClickA
-        || !geometryClickB
-    ){
+
+    const status =
+        document
+        .getElementById("geometryStatus");
+
+    if(!siteId){
+
+        status.textContent =
+            "ยังไม่ได้เลือก Site";
+
         return;
     }
 
-    const data =
-        await api(
-            `/api/wizard/${siteId}/geometry/mark`,
-            {
-                method:"POST",
-                body:JSON.stringify({
-                    pair:
-                        document
-                        .getElementById("geometryPair")
-                        .value,
+    if(
+        !geometryClickA
+        ||
+        !geometryClickB
+    ){
 
-                    phase:
-                        document
-                        .getElementById("geometryPhase")
-                        .value,
+        status.textContent =
+            "กรุณาคลิก Landmark "
+            +
+            "ให้ครบทั้งภาพ A และ B ก่อน";
 
-                    x_a_px:
-                        geometryClickA.x,
+        return;
+    }
 
-                    y_a_px:
-                        geometryClickA.y,
+    try{
 
-                    x_b_px:
-                        geometryClickB.x,
+        const pair =
+            document
+            .getElementById("geometryPair")
+            .value;
 
-                    y_b_px:
-                        geometryClickB.y,
-                })
-            }
-        );
+        const phase =
+            document
+            .getElementById("geometryPhase")
+            .value;
 
-    document
-        .getElementById("geometryStatus")
-        .textContent =
-        `Saved · Pair count = ${data.count}`;
+        const data =
+            await api(
+                `/api/wizard/${siteId}/geometry/mark`,
+                {
+                    method:"POST",
+                    body:JSON.stringify({
+                        pair,
+                        phase,
 
-    const state =
-        await api(
-            `/api/wizard/state/${siteId}`
-        );
+                        x_a_px:
+                            geometryClickA.x,
 
-    wizardState =
-        state.state;
+                        y_a_px:
+                            geometryClickA.y,
 
-    loadGeometryPair();
+                        x_b_px:
+                            geometryClickB.x,
+
+                        y_b_px:
+                            geometryClickB.y,
+                    })
+                }
+            );
+
+        const state =
+            await api(
+                `/api/wizard/state/${siteId}`
+            );
+
+        wizardState =
+            state.state;
+
+        loadGeometryPair();
+
+        status.textContent =
+            `Saved · ${phase.toUpperCase()} `
+            +
+            `Pair ${pair} · `
+            +
+            `Count ${data.count}/3`;
+
+    }catch(error){
+
+        status.textContent =
+            "Save Landmark failed\n"
+            +
+            String(error);
+    }
 };
 
 
@@ -2609,30 +2892,60 @@ document
     .getElementById("btnClearMarks")
     .onclick =
 async()=>{
-    if(!siteId)return;
 
-    await api(
-        `/api/wizard/${siteId}/geometry/clear`,
-        {
-            method:"POST",
-            body:JSON.stringify({
-                pair:
-                    document
-                    .getElementById("geometryPair")
-                    .value,
+    if(!siteId){
+        return;
+    }
 
-                phase:
-                    document
-                    .getElementById("geometryPhase")
-                    .value,
-            })
-        }
-    );
+    const status =
+        document
+        .getElementById("geometryStatus");
 
-    document
-        .getElementById("geometryStatus")
-        .textContent =
-        "Pair cleared";
+    try{
+
+        const pair =
+            document
+            .getElementById("geometryPair")
+            .value;
+
+        const phase =
+            document
+            .getElementById("geometryPhase")
+            .value;
+
+        await api(
+            `/api/wizard/${siteId}/geometry/clear`,
+            {
+                method:"POST",
+                body:JSON.stringify({
+                    pair,
+                    phase,
+                })
+            }
+        );
+
+        const state =
+            await api(
+                `/api/wizard/state/${siteId}`
+            );
+
+        wizardState =
+            state.state;
+
+        loadGeometryPair();
+
+        status.textContent =
+            `Cleared · ${phase.toUpperCase()} `
+            +
+            `Pair ${pair}`;
+
+    }catch(error){
+
+        status.textContent =
+            "Clear Pair failed\n"
+            +
+            String(error);
+    }
 };
 
 
@@ -2762,6 +3075,8 @@ async()=>{
             +
             "Runtime changed: false";
 
+        hideGeometryForceOverride();
+
 
     }catch(error){
 
@@ -2776,6 +3091,294 @@ async()=>{
     }
 };
 
+
+
+function hideGeometryForceOverride(){
+
+    const button =
+        document.getElementById(
+            "btnForceGeometry"
+        );
+
+    const status =
+        document.getElementById(
+            "geometryForceStatus"
+        );
+
+
+    if(button){
+        button.classList.add(
+            "hidden"
+        );
+    }
+
+
+    if(status){
+        status.classList.add(
+            "hidden"
+        );
+    }
+}
+
+
+async function refreshGeometryForceStatus(){
+
+    if(!siteId){
+        hideGeometryForceOverride();
+        return null;
+    }
+
+
+    const button =
+        document.getElementById(
+            "btnForceGeometry"
+        );
+
+    const statusBox =
+        document.getElementById(
+            "geometryForceStatus"
+        );
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/geometry-adapter/${siteId}/force-status`
+            );
+
+
+        if(
+            data.available
+            &&
+            data.allowed
+        ){
+
+            button
+                .classList
+                .remove(
+                    "hidden"
+                );
+
+
+            statusBox
+                .classList
+                .remove(
+                    "hidden"
+                );
+
+
+            const pairs =
+                (
+                    data.failed_pairs
+                    || []
+                )
+                .join(", ");
+
+
+            const g =
+                data.global_metrics
+                || {};
+
+
+            statusBox.textContent =
+                "⚠ FORCED OVERRIDE AVAILABLE\n"
+                +
+                "Independent Holdout = FAILED\n"
+                +
+                `Failed pairs: ${pairs || "unknown"}\n`
+                +
+                (
+                    g.median_abs_azimuth_error_deg
+                    != null
+                    ?
+                    `Global median: ${
+                        Number(
+                            g.median_abs_azimuth_error_deg
+                        ).toFixed(3)
+                    }°\n`
+                    :
+                    ""
+                )
+                +
+                (
+                    g.p90_abs_azimuth_error_deg
+                    != null
+                    ?
+                    `Global P90: ${
+                        Number(
+                            g.p90_abs_azimuth_error_deg
+                        ).toFixed(3)
+                    }°\n`
+                    :
+                    ""
+                )
+                +
+                "\nLAB เท่านั้น · Runtime ยังไม่ถูกเปลี่ยน";
+
+
+            return data;
+        }
+
+
+        hideGeometryForceOverride();
+
+        return data;
+
+
+    }catch(error){
+
+        hideGeometryForceOverride();
+
+        return null;
+    }
+}
+
+
+document
+    .getElementById(
+        "btnForceGeometry"
+    )
+    .onclick =
+async()=>{
+
+    if(!siteId){
+        return;
+    }
+
+
+    const confirmation =
+        prompt(
+            "Geometry นี้ไม่ผ่าน Independent Holdout\n\n"
+            +
+            "การ Override อาจทำให้ Bearing/พิกัดคลาดเคลื่อน\n"
+            +
+            "โหมดนี้อนุญาตเฉพาะ LAB\n\n"
+            +
+            "พิมพ์ FORCE เพื่อยืนยัน"
+        );
+
+
+    if(
+        String(
+            confirmation
+            || ""
+        )
+        .trim()
+        .toUpperCase()
+        !==
+        "FORCE"
+    ){
+        return;
+    }
+
+
+    const reason =
+        prompt(
+            "เหตุผลในการ Override (ไม่บังคับ)",
+            "temporary_lab_override"
+        );
+
+
+    const box =
+        document.getElementById(
+            "geometryStatus"
+        );
+
+
+    box.textContent =
+        "กำลังสร้าง FORCED Geometry Candidate...";
+
+
+    try{
+
+        const data =
+            await api(
+                `/api/geometry-adapter/${siteId}/force`,
+                {
+                    method:"POST",
+
+                    body:
+                        JSON.stringify({
+                            confirmation:
+                                "FORCE",
+
+                            reason:
+                                (
+                                    reason
+                                    ||
+                                    "temporary_lab_override"
+                                )
+                        }),
+                }
+            );
+
+
+        box.textContent =
+            "⚠ FORCED GEOMETRY CANDIDATE CREATED\n"
+            +
+            `Status: ${data.status}\n`
+            +
+            "Holdout passed: false\n"
+            +
+            `Failed pairs: ${
+                (
+                    data.failed_pairs
+                    || []
+                ).join(", ")
+            }\n\n`
+            +
+            "ยังไม่เปลี่ยน Active Runtime\n"
+            +
+            "ไปทำ True North / Final Verification / Revision / Activate ต่อ";
+
+
+        const statusBox =
+            document.getElementById(
+                "geometryForceStatus"
+            );
+
+
+        statusBox.textContent =
+            "⚠ Geometry Candidate นี้ถูกสร้างด้วย LAB operator override\n"
+            +
+            "Independent Holdout = FAILED";
+
+        statusBox
+            .classList
+            .remove(
+                "hidden"
+            );
+
+
+        document
+            .getElementById(
+                "btnForceGeometry"
+            )
+            .classList
+            .add(
+                "hidden"
+            );
+
+
+        const state =
+            await api(
+                `/api/wizard/state/${siteId}`
+            );
+
+
+        wizardState =
+            state.state;
+
+
+    }catch(error){
+
+        box.textContent =
+            String(
+                error
+            );
+    }
+};
 
 
 document
@@ -2835,6 +3438,8 @@ async()=>{
                 2
             );
 
+        hideGeometryForceOverride();
+
 
     }catch(error){
 
@@ -2842,6 +3447,8 @@ async()=>{
             String(
                 error
             );
+
+        await refreshGeometryForceStatus();
     }
 };
 
@@ -3424,6 +4031,8 @@ async()=>{
             `HFOV: ${data.summary.effective_hfov_deg}\n`
             +
             "Runtime changed: false";
+
+        hideGeometryForceOverride();
 
 
     }catch(error){

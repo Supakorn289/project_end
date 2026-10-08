@@ -16,6 +16,8 @@
         rel="stylesheet"
         href="/static/manager.css"
     >
+<link rel="stylesheet" href="/static/runtime_site_manager.css">
+<link rel="stylesheet" href="/static/runtime_site_manager_v1_1.css">
 </head>
 
 <body>
@@ -77,12 +79,7 @@
                 Tests
             </button>
 
-            <button
-                class="nav"
-                data-page="events"
-            >
-                Events
-            </button>
+
 
             <button
                 class="nav"
@@ -159,6 +156,12 @@
                 class="cards"
             ></div>
 
+            <div
+                id="overview-runtime-warning"
+                class="runtime-warning hidden"
+            ></div>
+
+
 
             <div class="panel">
 
@@ -207,80 +210,39 @@
             id="page-setup"
             class="page"
         >
-
             <div class="panel">
-
                 <div class="panel-head">
                     <div>
-                        <h2>
-                            Setup Wizard
-                        </h2>
-
+                        <h2>Site Setup</h2>
                         <p>
-                            Existing or new installation
+                            เลือกทำต่อจาก Site ที่มีอยู่ หรือสร้าง Site ใหม่
                         </p>
                     </div>
                 </div>
 
-
                 <div class="choice-grid">
-
-                    <button
+                    <a
                         class="choice"
-                        id="existing-choice"
+                        href="/setup-wizard?mode=existing"
                     >
-                        <strong>
-                            Existing Site
-                        </strong>
-
+                        <strong>จัดการ Site ที่มีอยู่</strong>
                         <span>
-                            Detect and reuse current calibration
+                            Resume DRAFT / CANDIDATE, ตรวจ ACTIVE
+                            หรือ Calibrate ใหม่เฉพาะส่วน
                         </span>
-                    </button>
+                    </a>
 
-
-                    <button
+                    <a
                         class="choice"
-                        id="new-choice"
+                        href="/setup-wizard?mode=new"
                     >
-                        <strong>
-                            New Site
-                        </strong>
-
+                        <strong>+ สร้าง Site ใหม่</strong>
                         <span>
-                            Start a new installation workflow
+                            สร้าง Site แยกใหม่โดยยังไม่แตะ Active Runtime
                         </span>
-                    </button>
-
+                    </a>
                 </div>
-
-
-                <div class="mode-row">
-
-                    <button
-                        class="mode-btn active"
-                        data-mode="LAB"
-                    >
-                        LAB
-                    </button>
-
-                    <button
-                        class="mode-btn"
-                        data-mode="PRODUCTION"
-                    >
-                        PRODUCTION
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="setup-plan"
-                    class="wizard-list"
-                ></div>
-
             </div>
-
         </section>
 
 
@@ -292,11 +254,15 @@
                 <div class="panel-head">
                     <div>
                         <h2>Sites</h2>
-                        <p>Runtime and Manager registry</p>
+                        <p>
+                            Manager registry และสถานะ Runtime ของแต่ละ Site
+                        </p>
                     </div>
                 </div>
 
-                <pre id="sites-json"></pre>
+                <div id="sites-list" class="site-list">
+                    Loading sites...
+                </div>
             </div>
         </section>
 
@@ -317,74 +283,139 @@
                     id="calibration-grid"
                     class="status-grid"
                 ></div>
+
+                <div
+                    id="calibration-runtime-note"
+                    class="runtime-warning hidden"
+                ></div>
+
             </div>
         </section>
 
 
-        <section
+                <section
             id="page-tests"
             class="page"
         >
             <div class="panel">
                 <div class="panel-head">
                     <div>
-                        <h2>Test Center</h2>
-                        <p>
-                            Runtime test actions arrive in Phase 2C
-                        </p>
+                        <h2>Runtime Test Center</h2>
+                        <p>ใช้เครื่องมือทดสอบจริงของโปรเจกต์ผ่าน Manager</p>
+                    </div>
+
+                    <div
+                        id="test-auth-state"
+                        class="badge muted"
+                    >
+                        Checking session...
                     </div>
                 </div>
 
-                <div class="test-grid">
-                    <div class="test">Camera</div>
-                    <div class="test">RTSP</div>
-                    <div class="test">PTZ</div>
-                    <div class="test">AI</div>
-                    <div class="test">CENTER → EDGE</div>
-                    <div class="test">EDGE → CENTER</div>
-                    <div class="test">Full Sweep</div>
-                    <div class="test">Preflight</div>
+                <div
+                    id="test-auth-box"
+                    class="test-auth hidden"
+                >
+                    <div>
+                        ต้อง Unlock Manager ก่อนรันคำสั่งที่มีผลกับ Runtime
+                    </div>
+
+                    <input
+                        id="test-manager-token"
+                        type="password"
+                        autocomplete="current-password"
+                        placeholder="Manager Token"
+                    >
+
+                    <button
+                        id="test-unlock-btn"
+                        type="button"
+                        class="action-btn"
+                    >
+                        Unlock
+                    </button>
                 </div>
+
+                <div class="test-note">
+                    Test ที่ต้องใช้กล้องหรือ PTZ จะหยุด Detection
+                    ชั่วคราว และคืนสถานะเดิมเมื่อการทดสอบจบ
+                </div>
+
+                <div
+                    id="runtime-test-grid"
+                    class="test-grid"
+                ></div>
             </div>
-        </section>
 
-
-        <section
-            id="page-events"
-            class="page"
-        >
             <div class="panel">
                 <div class="panel-head">
                     <div>
-                        <h2>Events</h2>
-                        <p>
-                            Event history arrives in the next phase
-                        </p>
+                        <h2>Test Result</h2>
+                        <p>ผลจากเครื่องมือที่รันล่าสุด</p>
                     </div>
                 </div>
 
-                <div class="empty">
-                    Event storage is not enabled yet.
-                </div>
+                <pre id="runtime-test-output">ยังไม่ได้รันการทดสอบ</pre>
             </div>
         </section>
 
 
-        <section
+
+
+
+                <section
             id="page-system"
             class="page"
         >
             <div class="panel">
                 <div class="panel-head">
                     <div>
-                        <h2>System</h2>
-                        <p>Server, network and services</p>
+                        <h2>System Health</h2>
+                        <p>Server, storage และ Runtime services</p>
                     </div>
                 </div>
 
-                <pre id="system-json"></pre>
+                <div
+                    id="system-summary-grid"
+                    class="status-grid"
+                ></div>
             </div>
-        </section>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Services</h2>
+                        <p>systemd services ที่เกี่ยวข้องกับ Smart Fire</p>
+                    </div>
+                </div>
+
+                <div
+                    id="system-services"
+                    class="service-list"
+                ></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Network</h2>
+                        <p>IPv4 interfaces ของเครื่อง</p>
+                    </div>
+                </div>
+
+                <div
+                    id="system-network"
+                    class="network-list"
+                ></div>
+            </div>
+
+                <pre
+                    id="system-json"
+                    class="hidden"
+                    aria-hidden="true"
+                ></pre>
+
+</section>
 
     </main>
 
@@ -393,5 +424,12 @@
 
 <script src="/static/manager.js"></script>
 
+
+<script
+    src="/static/control_center_operational.js"
+></script>
+
+<script src="/static/runtime_site_manager.js"></script>
+<script src="/static/runtime_site_manager_v1_1.js"></script>
 </body>
 </html>

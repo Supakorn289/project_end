@@ -189,6 +189,28 @@ fire:fire \
 
 
 # ------------------------------------------------------------
+# Runtime output directory ownership
+# ------------------------------------------------------------
+if id smartfire >/dev/null 2>&1; then
+    install -d \
+        -o smartfire \
+        -g smartfire \
+        -m 0755 \
+        "$PROJECT_ROOT/static"
+
+    chown -R \
+        smartfire:smartfire \
+        "$PROJECT_ROOT/static"
+
+    find "$PROJECT_ROOT/static" \
+        -type d -exec chmod 0755 {} \;
+
+    find "$PROJECT_ROOT/static" \
+        -type f -exec chmod 0644 {} \;
+fi
+
+
+# ------------------------------------------------------------
 # Venv
 # ------------------------------------------------------------
 

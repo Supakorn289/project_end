@@ -7,6 +7,11 @@ import os
 import shutil
 import subprocess
 
+from datetime import (
+    datetime,
+    timezone,
+)
+
 from pathlib import Path
 
 
@@ -40,6 +45,23 @@ LOCK_FILE = (
     / ".manager"
     / "geometry_solver.lock"
 )
+
+
+FAILED_CANDIDATE_NAME = (
+    "preset_rotation_failed_"
+    "holdout_MIXED_AB_v3.json"
+)
+
+
+def _failed_geometry_candidate_path(
+    site_id,
+):
+
+    return candidate_path(
+        site_id,
+        "geometry_solver_workspace/"
+        + FAILED_CANDIDATE_NAME,
+    )
 
 
 def _sha256_file(
@@ -130,12 +152,21 @@ def _summary(
     candidate,
 ):
 
-    holdout = (
-        candidate
-        .get(
-            "post_refit_holdout",
-            {}
+    holdout_evaluation = (
+        candidate.get(
+            "post_refit_holdout"
         )
+        or
+        candidate.get(
+            "holdout_evaluation"
+        )
+        or
+        {}
+    )
+
+
+    holdout = (
+        holdout_evaluation
         .get(
             "global_metrics",
             {}
@@ -179,6 +210,1116 @@ def _summary(
 
         "global_metrics":
             holdout,
+    }
+
+
+
+GEOMETRY_DIAGNOSTIC_PREFIX = (
+    "GEOMETRY_DIAGNOSTIC_JSON="
+)
+
+
+def _extract_geometry_diagnostic(
+    stdout,
+):
+
+    stdout = str(
+        stdout
+        or ""
+    )
+
+
+    for line in reversed(
+        stdout.splitlines()
+    ):
+
+        line = line.strip()
+
+
+        if not line.startswith(
+            GEOMETRY_DIAGNOSTIC_PREFIX
+        ):
+            continue
+
+
+        raw = line[
+            len(
+                GEOMETRY_DIAGNOSTIC_PREFIX
+            ):
+        ]
+
+
+        try:
+
+            value = json.loads(
+                raw
+            )
+
+
+            if isinstance(
+                value,
+                dict,
+            ):
+                return value
+
+
+        except Exception:
+            return None
+
+
+    return None
+
+
+def _geometry_failure_user_message(
+    diagnostic,
+    stderr,
+):
+
+    lines = [
+        "GEOMETRY SOLVER FAILED",
+    ]
+
+
+    if isinstance(
+        diagnostic,
+        dict,
+    ):
+
+        failures = (
+            diagnostic.get(
+                "hard_failures",
+                [],
+            )
+            or []
+        )
+
+        reviews = (
+            diagnostic.get(
+                "review_pairs",
+                [],
+            )
+            or []
+        )
+
+
+        if failures:
+
+            lines.extend([
+                "",
+                (
+                    "สาเหตุ: Training Landmark "
+                    "บาง Pair ไม่สามารถสร้าง "
+                    "rotation ที่สอดคล้องกันได้"
+                ),
+            ])
+
+
+            for item in failures:
+
+                pair = item.get(
+                    "pair",
+                    "?",
+                )
+
+                reason = item.get(
+                    "reason",
+                    "RANSAC failed",
+                )
+
+                lines.append(
+                    f"❌ TRAIN Pair {pair}: "
+                    f"{reason}"
+                )
+
+
+                residuals = (
+                    item.get(
+                        "train_residuals_deg",
+                        [],
+                    )
+                    or []
+                )
+
+
+                if residuals:
+
+                    values = ", ".join(
+                        f"M{i + 1}="
+                        f"{float(value):.3f}°"
+
+                        for i, value
+                        in enumerate(
+                            residuals
+                        )
+                    )
+
+                    lines.append(
+                        "   Direct-fit residual: "
+                        + values
+                    )
+
+
+                suspect = item.get(
+                    "suspect_mark_index"
+                )
+
+
+                if suspect is not None:
+
+                    lines.append(
+                        "   จุดที่ควรตรวจอันดับแรก: "
+                        f"Mark {suspect}"
+                    )
+
+
+            threshold = diagnostic.get(
+                "ransac_threshold_deg"
+            )
+
+            minimum = diagnostic.get(
+                "minimum_pair_inliers"
+            )
+
+
+            if (
+                threshold is not None
+                and
+                minimum is not None
+            ):
+
+                lines.append(
+                    ""
+                    "เกณฑ์ RANSAC: "
+                    f"ต้องมีอย่างน้อย {minimum} "
+                    "inliers ภายใน "
+                    f"{float(threshold):.2f}°"
+                )
+
+
+        if reviews:
+
+            lines.extend([
+                "",
+                (
+                    "คู่ที่ยังไม่ทำให้ Solver crash "
+                    "แต่ควรตรวจเพิ่มเติม:"
+                ),
+            ])
+
+
+            for item in reviews:
+
+                lines.append(
+                    "⚠ HOLDOUT Pair "
+                    f"{item.get('pair', '?')}: "
+                    "median="
+                    f"{float(item.get('median_deg', 0.0)):.3f}° "
+                    "p90="
+                    f"{float(item.get('p90_deg', 0.0)):.3f}° "
+                    "max="
+                    f"{float(item.get('max_deg', 0.0)):.3f}°"
+                )
+
+
+        if failures:
+
+            lines.extend([
+                "",
+                (
+                    "วิธีแก้: ตรวจ/เพิ่ม Landmark "
+                    "ของ Pair ที่ระบุ โดยเลือก "
+                    "วัตถุไกล คงที่ และจุดชัด"
+                ),
+                (
+                    "หลังแก้ Landmark ให้กด "
+                    "\"เตรียมข้อมูลสำหรับ Solver\" "
+                    "ใหม่ แล้วค่อยคำนวณอีกครั้ง"
+                ),
+            ])
+
+
+            return "\n".join(
+                lines
+            )
+
+
+    # Fallback เมื่อไม่มี structured diagnostic
+    stderr = str(
+        stderr
+        or ""
+    ).strip()
+
+
+    if stderr:
+
+        last_line = (
+            stderr.splitlines()[-1]
+        )
+
+        lines.extend([
+            "",
+            "รายละเอียด:",
+            last_line,
+        ])
+
+
+    return "\n".join(
+        lines
+    )
+
+
+def _holdout_gate_diagnostic(
+    result_file,
+):
+
+    result_file = Path(
+        result_file
+    )
+
+
+    if not result_file.exists():
+        return None
+
+
+    try:
+
+        payload = _read_json(
+            result_file
+        )
+
+
+    except Exception:
+        return None
+
+
+    checks = (
+        payload.get(
+            "production_pair_checks",
+            {},
+        )
+        or {}
+    )
+
+    evaluation = (
+        payload.get(
+            "holdout_evaluation",
+            {},
+        )
+        or {}
+    )
+
+    pair_metrics = (
+        evaluation.get(
+            "pairs",
+            {},
+        )
+        or {}
+    )
+
+
+    failed = []
+
+
+    for pair, passed in checks.items():
+
+        if bool(
+            passed
+        ):
+            continue
+
+
+        metrics = (
+            pair_metrics.get(
+                pair,
+                {},
+            )
+            or {}
+        )
+
+
+        failed.append({
+            "pair":
+                pair,
+
+            "median_deg":
+                metrics.get(
+                    "median_abs_azimuth_error_deg"
+                ),
+
+            "p90_deg":
+                metrics.get(
+                    "p90_abs_azimuth_error_deg"
+                ),
+
+            "max_deg":
+                metrics.get(
+                    "max_abs_azimuth_error_deg"
+                ),
+
+            "status":
+                metrics.get(
+                    "status"
+                ),
+        })
+
+
+    return {
+        "stage":
+            "holdout_gate",
+
+        "failed_pairs":
+            failed,
+
+        "global_metrics":
+            (
+                evaluation.get(
+                    "global_metrics",
+                    {},
+                )
+                or {}
+            ),
+    }
+
+
+def _holdout_failure_user_message(
+    diagnostic,
+):
+
+    lines = [
+        "GEOMETRY HOLDOUT FAILED",
+        "",
+        (
+            "Solver ทำงานจบ แต่ Independent "
+            "Holdout ไม่ผ่าน Production Gate"
+        ),
+    ]
+
+
+    if not isinstance(
+        diagnostic,
+        dict,
+    ):
+
+        return "\n".join(
+            lines
+        )
+
+
+    failed = (
+        diagnostic.get(
+            "failed_pairs",
+            [],
+        )
+        or []
+    )
+
+
+    if failed:
+
+        lines.extend([
+            "",
+            "Pair ที่ไม่ผ่าน:",
+        ])
+
+
+        for item in failed:
+
+            pair = item.get(
+                "pair",
+                "?",
+            )
+
+            median = item.get(
+                "median_deg"
+            )
+
+            p90 = item.get(
+                "p90_deg"
+            )
+
+            maximum = item.get(
+                "max_deg"
+            )
+
+
+            parts = [
+                f"❌ HOLDOUT Pair {pair}",
+            ]
+
+
+            if median is not None:
+                parts.append(
+                    "median="
+                    f"{float(median):.3f}°"
+                )
+
+            if p90 is not None:
+                parts.append(
+                    "p90="
+                    f"{float(p90):.3f}°"
+                )
+
+            if maximum is not None:
+                parts.append(
+                    "max="
+                    f"{float(maximum):.3f}°"
+                )
+
+
+            lines.append(
+                " | ".join(
+                    parts
+                )
+            )
+
+
+    metrics = (
+        diagnostic.get(
+            "global_metrics",
+            {},
+        )
+        or {}
+    )
+
+
+    if metrics:
+
+        median = metrics.get(
+            "median_abs_azimuth_error_deg"
+        )
+
+        p90 = metrics.get(
+            "p90_abs_azimuth_error_deg"
+        )
+
+
+        if (
+            median is not None
+            or
+            p90 is not None
+        ):
+
+            lines.extend([
+                "",
+                "Global Holdout:",
+            ])
+
+
+            if median is not None:
+                lines.append(
+                    "median="
+                    f"{float(median):.3f}°"
+                )
+
+            if p90 is not None:
+                lines.append(
+                    "p90="
+                    f"{float(p90):.3f}°"
+                )
+
+
+    lines.extend([
+        "",
+        (
+            "ให้ตรวจ Landmark ของ Pair ที่ระบุ "
+            "แล้ว Prepare Solver ใหม่ก่อนคำนวณซ้ำ"
+        ),
+    ])
+
+
+    return "\n".join(
+        lines
+    )
+
+
+def failed_geometry_force_status(
+    site_id,
+):
+
+    state = load_state(
+        site_id
+    )
+
+
+    mode = str(
+        state.get(
+            "mode",
+            "LAB",
+        )
+        or "LAB"
+    ).upper()
+
+
+    failed_file = (
+        _failed_geometry_candidate_path(
+            site_id
+        )
+    )
+
+
+    manifest_file = (
+        candidate_path(
+            site_id,
+            "geometry_inputs/"
+            "manifest.json",
+        )
+    )
+
+
+    exists = (
+        failed_file.exists()
+    )
+
+
+    stale = False
+
+
+    if exists:
+
+        if not manifest_file.exists():
+
+            stale = True
+
+        else:
+
+            try:
+
+                stale = (
+                    failed_file.stat().st_mtime_ns
+                    <
+                    manifest_file.stat().st_mtime_ns
+                )
+
+            except OSError:
+
+                stale = True
+
+
+    candidate = None
+
+
+    if (
+        exists
+        and
+        not stale
+    ):
+
+        try:
+
+            candidate = (
+                _read_json(
+                    failed_file
+                )
+            )
+
+        except Exception:
+
+            candidate = None
+
+
+    gate = (
+        (
+            candidate
+            or {}
+        )
+        .get(
+            "independent_holdout_gate",
+            {},
+        )
+        or {}
+    )
+
+
+    presets = (
+        (
+            candidate
+            or {}
+        )
+        .get(
+            "presets"
+        )
+    )
+
+
+    structurally_valid = bool(
+        isinstance(
+            candidate,
+            dict,
+        )
+
+        and
+
+        candidate.get(
+            "status"
+        )
+        ==
+        "HOLDOUT_FAILED_CANDIDATE_NOT_INSTALLED"
+
+        and
+
+        candidate.get(
+            "model"
+        )
+        ==
+        "calibrated-global-raw-ray-rotation"
+
+        and
+
+        gate.get(
+            "passed"
+        )
+        is False
+
+        and
+
+        isinstance(
+            presets,
+            dict,
+        )
+
+        and
+
+        all(
+            str(preset)
+            in presets
+
+            for preset
+            in range(
+                1,
+                10,
+            )
+        )
+    )
+
+
+    available = bool(
+        exists
+        and
+        not stale
+        and
+        structurally_valid
+    )
+
+
+    pair_checks = (
+        gate.get(
+            "pairs",
+            {},
+        )
+        or {}
+    )
+
+
+    failed_pairs = [
+        pair
+        for pair, passed
+        in pair_checks.items()
+        if passed is not True
+    ]
+
+
+    holdout_metrics = (
+        (
+            candidate
+            or {}
+        )
+        .get(
+            "holdout_evaluation",
+            {},
+        )
+        .get(
+            "global_metrics",
+            {},
+        )
+        or {}
+    )
+
+
+    return {
+        "ok":
+            True,
+
+        "site_id":
+            site_id,
+
+        "mode":
+            mode,
+
+        "available":
+            available,
+
+        # Force override is intentionally LAB-only.
+        "allowed":
+            bool(
+                available
+                and
+                mode
+                ==
+                "LAB"
+            ),
+
+        "stale":
+            bool(
+                stale
+            ),
+
+        "failed_pairs":
+            failed_pairs,
+
+        "global_metrics":
+            holdout_metrics,
+
+        "reason":
+            (
+                None
+                if (
+                    available
+                    and
+                    mode
+                    ==
+                    "LAB"
+                )
+                else
+                (
+                    "force_override_lab_only"
+                    if (
+                        available
+                        and
+                        mode
+                        !=
+                        "LAB"
+                    )
+                    else
+                    (
+                        "failed_candidate_stale"
+                        if stale
+                        else
+                        "no_current_failed_candidate"
+                    )
+                )
+            ),
+
+        "runtime_changed":
+            False,
+    }
+
+
+def force_failed_geometry_candidate(
+    site_id,
+    *,
+    confirmation,
+    reason=None,
+):
+
+    status = (
+        failed_geometry_force_status(
+            site_id
+        )
+    )
+
+
+    if (
+        str(
+            confirmation
+            or ""
+        )
+        .strip()
+        .upper()
+        !=
+        "FORCE"
+    ):
+
+        raise ValueError(
+            "confirmation must be FORCE"
+        )
+
+
+    if not status.get(
+        "allowed"
+    ):
+
+        raise RuntimeError(
+            status.get(
+                "reason"
+            )
+            or
+            "force_override_not_allowed"
+        )
+
+
+    failed_file = (
+        _failed_geometry_candidate_path(
+            site_id
+        )
+    )
+
+
+    candidate = (
+        _read_json(
+            failed_file
+        )
+    )
+
+
+    gate = (
+        candidate.get(
+            "independent_holdout_gate",
+            {},
+        )
+        or {}
+    )
+
+
+    if (
+        gate.get(
+            "passed"
+        )
+        is not False
+    ):
+
+        raise RuntimeError(
+            "failed candidate does not "
+            "contain a failed holdout gate"
+        )
+
+
+    forced_at = (
+        datetime.now(
+            timezone.utc
+        )
+        .isoformat()
+    )
+
+
+    reason_text = str(
+        reason
+        or
+        "manual_operator_override"
+    ).strip()
+
+
+    if not reason_text:
+
+        reason_text = (
+            "manual_operator_override"
+        )
+
+
+    reason_text = (
+        reason_text[
+            :300
+        ]
+    )
+
+
+    forced = dict(
+        candidate
+    )
+
+
+    forced[
+        "status"
+    ] = (
+        "FORCED_CANDIDATE_NOT_INSTALLED"
+    )
+
+
+    forced[
+        "operator_override"
+    ] = {
+        "enabled":
+            True,
+
+        "acknowledged_holdout_failure":
+            True,
+
+        "scope":
+            "LAB",
+
+        "forced_at_utc":
+            forced_at,
+
+        "reason":
+            reason_text,
+
+        "source_status":
+            candidate.get(
+                "status"
+            ),
+
+        "source_failed_candidate":
+            str(
+                failed_file
+            ),
+    }
+
+
+    manager_candidate = (
+        save_candidate(
+            site_id,
+            "preset_rotation.json",
+            forced,
+        )
+    )
+
+
+    intrinsics_file = (
+        candidate_path(
+            site_id,
+            "camera_intrinsics.json",
+        )
+    )
+
+
+    intrinsics_sha256 = (
+        _sha256_file(
+            intrinsics_file
+        )
+        if intrinsics_file.exists()
+        else None
+    )
+
+
+    state = load_state(
+        site_id
+    )
+
+
+    geometry = (
+        state.setdefault(
+            "geometry",
+            {},
+        )
+    )
+
+
+    geometry[
+        "candidate"
+    ] = forced
+
+
+    geometry[
+        "solver_result"
+    ] = {
+        "engine":
+            "solve_final_mixed_"
+            "rotation_AB_v3.py",
+
+        "candidate_file":
+            str(
+                manager_candidate
+            ),
+
+        "workspace":
+            str(
+                failed_file.parent
+            ),
+
+        "passed":
+            False,
+
+        "forced_override":
+            True,
+
+        "holdout_passed":
+            False,
+
+        "source_failed_candidate":
+            str(
+                failed_file
+            ),
+
+        "intrinsics_file":
+            str(
+                intrinsics_file
+            ),
+
+        "intrinsics_sha256":
+            intrinsics_sha256,
+    }
+
+
+    geometry[
+        "override"
+    ] = {
+        "enabled":
+            True,
+
+        "forced_at_utc":
+            forced_at,
+
+        "reason":
+            reason_text,
+
+        "failed_pairs":
+            status.get(
+                "failed_pairs",
+                [],
+            ),
+
+        "global_metrics":
+            status.get(
+                "global_metrics",
+                {},
+            ),
+    }
+
+
+    state[
+        "step"
+    ] = "TRUE_NORTH"
+
+
+    save_state(
+        site_id,
+        state,
+    )
+
+
+    return {
+        "ok":
+            True,
+
+        "site_id":
+            site_id,
+
+        "status":
+            forced[
+                "status"
+            ],
+
+        "forced_override":
+            True,
+
+        "holdout_passed":
+            False,
+
+        "failed_pairs":
+            status.get(
+                "failed_pairs",
+                [],
+            ),
+
+        "global_metrics":
+            status.get(
+                "global_metrics",
+                {},
+            ),
+
+        "candidate_file":
+            str(
+                manager_candidate
+            ),
+
+        "warning":
+            (
+                "Geometry นี้ไม่ผ่าน Independent "
+                "Holdout และถูกเปิดใช้ด้วย "
+                "LAB operator override"
+            ),
+
+        "runtime_changed":
+            False,
     }
 
 
@@ -392,6 +1533,12 @@ def run_existing_geometry_solver(
         / "preset_rotation_candidate_MIXED_AB_v3.json"
     )
 
+    failed_candidate_file = (
+        workspace
+        / FAILED_CANDIDATE_NAME
+    )
+
+
     stdout_file = (
         workspace
         / "solver.stdout.txt"
@@ -409,6 +1556,7 @@ def run_existing_geometry_solver(
         holdout_file,
         result_file,
         candidate_file,
+        failed_candidate_file,
     ):
 
         try:
@@ -520,6 +1668,13 @@ def run_existing_geometry_solver(
     )
 
 
+    env[
+        "SMART_FIRE_MIXED_FAILED_CANDIDATE"
+    ] = str(
+        failed_candidate_file
+    )
+
+
     LOCK_FILE.parent.mkdir(
         parents=True,
         exist_ok=True,
@@ -613,11 +1768,27 @@ def run_existing_geometry_solver(
 
     if process.returncode != 0:
 
+        diagnostic = (
+            _extract_geometry_diagnostic(
+                process.stdout
+            )
+        )
+
+
         return {
             "ok": False,
 
             "error":
                 "geometry_solver_failed",
+
+            "user_message":
+                _geometry_failure_user_message(
+                    diagnostic,
+                    process.stderr,
+                ),
+
+            "diagnostic":
+                diagnostic,
 
             "return_code":
                 int(
@@ -643,12 +1814,27 @@ def run_existing_geometry_solver(
 
     if not candidate_file.exists():
 
+        diagnostic = (
+            _holdout_gate_diagnostic(
+                result_file
+            )
+        )
+
+
         return {
             "ok": False,
 
             "error":
                 "holdout_failed_or_"
                 "candidate_not_created",
+
+            "user_message":
+                _holdout_failure_user_message(
+                    diagnostic
+                ),
+
+            "diagnostic":
+                diagnostic,
 
             "result_file":
                 (

@@ -143,6 +143,19 @@ FINAL_CANDIDATE = Path(
 )
 
 
+FAILED_HOLDOUT_CANDIDATE = Path(
+    os.getenv(
+        "SMART_FIRE_MIXED_FAILED_CANDIDATE",
+        str(
+            FINAL_CANDIDATE.with_name(
+                "preset_rotation_failed_"
+                "holdout_MIXED_AB_v3.json"
+            )
+        ),
+    )
+)
+
+
 POSITIVE_PAIRS = [
     "1-2",
     "2-3",
@@ -314,6 +327,9 @@ def evaluate_relative_rotation(
 
     results = {}
 
+    hard_failures = []
+    review_pairs = []
+
 
     for index, (a, b) in enumerate(
         core.PAIR_LIST,
@@ -322,16 +338,172 @@ def evaluate_relative_rotation(
 
         key = f"{a}-{b}"
 
-
-        fit = (
-            core.robust_relative_rotation(
-                train[key],
-                seed=(
-                    81000
-                    + index
-                ),
-            )
+        train_count = len(
+            train[
+                key
+            ]
         )
+
+        holdout_count = len(
+            holdout[
+                key
+            ]
+        )
+
+
+        try:
+
+            fit = (
+                core.robust_relative_rotation(
+                    train[key],
+                    seed=(
+                        81000
+                        + index
+                    ),
+                )
+            )
+
+
+        except Exception as exc:
+
+            residuals = []
+            suspect_mark_index = None
+
+
+            # Best-effort residuals เพื่อช่วยบอกว่า
+            # mark ไหนน่าสงสัยที่สุด
+            try:
+
+                rays_a = np.asarray(
+                    [
+                        obs["ray_a"]
+                        for obs
+                        in train[key]
+                    ],
+                    dtype=float,
+                )
+
+                rays_b = np.asarray(
+                    [
+                        obs["ray_b"]
+                        for obs
+                        in train[key]
+                    ],
+                    dtype=float,
+                )
+
+
+                if (
+                    len(rays_a) >= 2
+                    and
+                    len(rays_a)
+                    ==
+                    len(rays_b)
+                ):
+
+                    direct_R = (
+                        core.fit_rotation_b_to_a(
+                            rays_a,
+                            rays_b,
+                        )
+                    )
+
+                    direct_errors = (
+                        core.residual_angles_deg(
+                            direct_R,
+                            rays_a,
+                            rays_b,
+                        )
+                    )
+
+                    residuals = [
+                        float(value)
+                        for value
+                        in direct_errors
+                    ]
+
+
+                    if residuals:
+
+                        suspect_mark_index = (
+                            int(
+                                np.argmax(
+                                    direct_errors
+                                )
+                            )
+                            + 1
+                        )
+
+
+            except Exception:
+                # Diagnostic ต้องไม่บดบัง root cause เดิม
+                residuals = []
+                suspect_mark_index = None
+
+
+            failure = {
+                "pair":
+                    key,
+
+                "phase":
+                    "train",
+
+                "stage":
+                    "ransac",
+
+                "reason":
+                    str(
+                        exc
+                    ),
+
+                "train_count":
+                    int(
+                        train_count
+                    ),
+
+                "holdout_count":
+                    int(
+                        holdout_count
+                    ),
+
+                "train_residuals_deg":
+                    residuals,
+
+                "suspect_mark_index":
+                    suspect_mark_index,
+            }
+
+
+            hard_failures.append(
+                failure
+            )
+
+
+            results[
+                key
+            ] = {
+                "passed":
+                    False,
+
+                "hard_failure":
+                    True,
+
+                **failure,
+            }
+
+
+            print(
+                f"{key:>5} "
+                f"| train="
+                f"{train_count:3d} "
+                f"| holdout="
+                f"{holdout_count:3d} "
+                f"| FAIL "
+                f"| {exc}"
+            )
+
+
+            continue
 
 
         R = fit[
@@ -394,7 +566,20 @@ def evaluate_relative_rotation(
         )
 
 
-        results[key] = {
+        item = {
+            "pair":
+                key,
+
+            "train_count":
+                int(
+                    train_count
+                ),
+
+            "holdout_count":
+                int(
+                    holdout_count
+                ),
+
             "median_deg":
                 median,
 
@@ -411,12 +596,24 @@ def evaluate_relative_rotation(
         }
 
 
+        results[
+            key
+        ] = item
+
+
+        if not passed:
+
+            review_pairs.append(
+                item
+            )
+
+
         print(
             f"{key:>5} "
             f"| train="
-            f"{len(train[key]):3d} "
+            f"{train_count:3d} "
             f"| holdout="
-            f"{len(holdout[key]):3d} "
+            f"{holdout_count:3d} "
             f"| median="
             f"{median:7.3f}° "
             f"| p90="
@@ -425,6 +622,60 @@ def evaluate_relative_rotation(
             f"{maximum:7.3f}° "
             f"| "
             f"{'PASS' if passed else 'REVIEW'}"
+        )
+
+
+    # --------------------------------------------------------
+    # ถ้า Train RANSAC พังอย่างน้อยหนึ่ง Pair:
+    # ส่ง JSON marker ให้ Manager แสดงสาเหตุในหน้าเว็บ
+    # --------------------------------------------------------
+
+    if hard_failures:
+
+        diagnostic = {
+            "stage":
+                "pairwise_transfer_preflight",
+
+            "hard_failures":
+                hard_failures,
+
+            "review_pairs":
+                review_pairs,
+
+            "ransac_threshold_deg":
+                float(
+                    core.RANSAC_THRESHOLD_DEG
+                ),
+
+            "minimum_pair_inliers":
+                int(
+                    core.MIN_PAIR_INLIERS
+                ),
+        }
+
+
+        print(
+            "GEOMETRY_DIAGNOSTIC_JSON="
+            +
+            json.dumps(
+                diagnostic,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
+
+
+        raise RuntimeError(
+            "Geometry pair preflight failed: "
+            +
+            ", ".join(
+                item[
+                    "pair"
+                ]
+                for item
+                in hard_failures
+            )
         )
 
 
@@ -879,10 +1130,106 @@ def main():
     #
     if not passed:
 
+        # Keep a TRAIN-only candidate for an explicit
+        # operator override. This artifact is NOT active and
+        # is never treated as a PASS candidate.
+        failed_payload = {
+            "format":
+                "smart-fire-preset-rotation-MIXED-AB-v3",
+
+            "status":
+                "HOLDOUT_FAILED_CANDIDATE_NOT_INSTALLED",
+
+            "model":
+                "calibrated-global-raw-ray-rotation",
+
+            "reference_preset":
+                1,
+
+            "runtime_image_matching":
+                False,
+
+            "near_field_negative_marks_used":
+                False,
+
+            "physical_lens_offsets_m": {
+                "horizontal_from_pan_axis":
+                    0.033,
+
+                "vertical_from_axis":
+                    0.057,
+
+                "used_in_solver":
+                    False,
+            },
+
+            # IMPORTANT:
+            # Use TRAIN-only Q here. Do not refit with failed
+            # holdout data because that would destroy the
+            # meaning of independent validation.
+            "presets":
+                bundle.serialize_Q(
+                    Q_train
+                ),
+
+            "independent_holdout_gate": {
+                "passed":
+                    False,
+
+                "pairs":
+                    pair_checks,
+            },
+
+            "train_evaluation":
+                train_eval,
+
+            "holdout_evaluation":
+                holdout_eval,
+
+            "pair_transfer":
+                pair_transfer,
+
+            "optimizer":
+                payload.get(
+                    "optimizer",
+                    {},
+                ),
+
+            "note":
+                (
+                    "TRAIN-only geometry retained after "
+                    "independent holdout failure. "
+                    "Not activatable unless an operator "
+                    "explicitly creates a FORCED candidate."
+                ),
+        }
+
+
+        FAILED_HOLDOUT_CANDIDATE.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+
+        FAILED_HOLDOUT_CANDIDATE.write_text(
+            json.dumps(
+                failed_payload,
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+
         print()
         print(
             "FINAL_MIXED_RESULT="
             "HOLDOUT_FAILED"
+        )
+
+        print(
+            f"FAILED_CANDIDATE="
+            f"{FAILED_HOLDOUT_CANDIDATE}"
         )
 
         print(

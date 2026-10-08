@@ -21,6 +21,11 @@ from manager.services.ops_agent import (
 )
 
 
+from manager.services.site_registry import (
+    reconcile_active_runtime,
+)
+
+
 activation_bp = Blueprint(
     "manager_activation",
     __name__,
@@ -113,6 +118,27 @@ def activation_execute(
             site_id,
             revision_id,
         )
+
+
+        if result.get(
+            "ok"
+        ):
+            try:
+                reconcile_active_runtime()
+                result[
+                    "registry_reconciled"
+                ] = True
+
+            except Exception as exc:
+                result[
+                    "registry_reconciled"
+                ] = False
+                result[
+                    "registry_warning"
+                ] = (
+                    f"{type(exc).__name__}: "
+                    f"{exc}"
+                )
 
 
         return jsonify(
