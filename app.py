@@ -3,6 +3,7 @@
 
 import json
 import time
+from pathlib import Path
 
 from flask import (
     Flask,
@@ -409,6 +410,8 @@ HTML = r"""
     </div>
 
 
+    <div id="runtime-identity" class="connection" aria-live="polite">Active Runtime: loading...</div>
+
     <div
         id="connection-status"
         class="connection"
@@ -621,6 +624,10 @@ HTML = r"""
                     2
                 )
             );
+            const identity = data.active_runtime || {};
+            document.getElementById('runtime-identity').textContent = identity.identity_valid
+                ? `Active Runtime: ${identity.site_id} / ${identity.revision_id} · ${identity.mode}`
+                : 'Active Runtime: identity unavailable (check Manager)';
 
 
             if (response.ok) {
@@ -980,12 +987,42 @@ def index():
 # Status API
 # ============================================================
 
+def active_runtime_identity():
+    """Read only the active calibration symlink; no revision secrets."""
+    rotation = Path("/opt/smart-fire-detection-v2/calibration/preset_rotation_ACTIVE.json")
+    root = Path("/opt/smart-fire-detection-v2/calibration/sites")
+    result = {"site_id": None, "revision_id": None, "mode": "UNKNOWN", "identity_valid": False}
+    try:
+        if not rotation.is_symlink():
+            return result
+        parts = rotation.resolve(strict=True).relative_to(root.resolve()).parts
+        if len(parts) != 4 or parts[1] != "revisions" or parts[3] != "preset_rotation.json":
+            return result
+        site, rev = parts[0], parts[2]
+        # The currently active source revision may have a different mode from
+        # site metadata, so use the immutable revision descriptor.
+        record = Path("/opt/smart-fire-detection-v2/calibration/.manager/revisions") / site / rev / "revision.json"
+        mode = "UNKNOWN"
+        try:
+            desc = json.loads(record.read_text(encoding="utf-8"))
+            mode = str(desc.get("mode") or "UNKNOWN")
+        except (OSError, ValueError):
+            pass
+        result.update({"site_id":site,"revision_id":rev,"mode":mode,"identity_valid":True})
+    except (OSError, RuntimeError, ValueError):
+        pass
+    return result
+
+
 @app.get("/api/status")
 def api_status():
 
     payload, status_code = (
         read_status()
     )
+
+    payload = dict(payload) if isinstance(payload, dict) else {"runtime_status":"unknown"}
+    payload["active_runtime"] = active_runtime_identity()
 
     response = jsonify(
         payload

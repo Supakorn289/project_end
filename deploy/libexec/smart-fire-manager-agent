@@ -1203,6 +1203,10 @@ ACTIVATION_ENV_ALLOWED = {
 
     "ENABLE_TRUE_NORTH",
     "ENABLE_GPS",
+    "ALERT_COOLDOWN_SEC",
+    "ALERT_DEDUP_IOU_THRESHOLD",
+    "FUSION_ANCHOR_MAX_AGE_SEC",
+    "FUSION_PENDING_SAFETY_SEC",
 }
 
 
@@ -1503,6 +1507,28 @@ def _normalize_activation_env(
                     f"{key}: expected 0/1"
                 )
 
+
+        elif key in {
+            "ALERT_COOLDOWN_SEC",
+            "ALERT_DEDUP_IOU_THRESHOLD",
+            "FUSION_ANCHOR_MAX_AGE_SEC",
+            "FUSION_PENDING_SAFETY_SEC",
+        }:
+            import math
+            ranges = {
+                "ALERT_COOLDOWN_SEC": (0, 3600),
+                "ALERT_DEDUP_IOU_THRESHOLD": (0, 1),
+                "FUSION_ANCHOR_MAX_AGE_SEC": (1, 120),
+                "FUSION_PENDING_SAFETY_SEC": (1, 600),
+            }
+            try:
+                number = float(value)
+            except ValueError:
+                raise ValueError(f"{key}: invalid number") from None
+            low, high = ranges[key]
+            if not math.isfinite(number) or not low <= number <= high:
+                raise ValueError(f"{key}: out of range")
+            value = f"{number:.10g}"
 
         elif key == "RTSP_PATH":
 
@@ -1826,6 +1852,30 @@ def _build_activation_environment(
                     "TELEGRAM_CHAT_ID"
                 ] = chat_id
 
+
+    # SITE_V24_SETTINGS: settings must come from this revision only.
+    # Older revisions get explicit defaults, never values from a prior Site.
+    setting_file = artifacts / "site_detection_settings.json"
+    if setting_file.is_symlink():
+        raise ValueError("settings symlink forbidden")
+    raw_values = {
+        "ALERT_COOLDOWN_SEC": "30",
+        "ALERT_DEDUP_IOU_THRESHOLD": "0.5",
+        "FUSION_ANCHOR_MAX_AGE_SEC": "15",
+        "FUSION_PENDING_SAFETY_SEC": "90",
+    }
+    if setting_file.is_file():
+        item = _activation_json(setting_file)
+        if item.get("schema_version") != 1 or not isinstance(item.get("runtime_env"),dict):
+            raise ValueError("settings schema invalid")
+        provided = item["runtime_env"]
+        if set(provided) != set(raw_values):
+            raise ValueError("settings fields mismatch")
+        raw_values = provided
+    for name in raw_values:
+        env[name] = raw_values[name]
+    if float(env["FUSION_PENDING_SAFETY_SEC"]) < float(env["FUSION_ANCHOR_MAX_AGE_SEC"]):
+        raise ValueError("fusion_pending_safety_less_than_anchor_age")
 
     location = (
         (
@@ -3633,6 +3683,115 @@ def activate_revision_transaction(
         )
 
 
+# ===========================================================
+# Phase 4-5: privileged live 3-preset camera test (LAB only)
+# ===========================================================
+import secrets as _live_secrets
+import grp as _live_grp
+
+_LIVE_ROOT = Path('/opt/smart-fire-detection-v2')
+_LIVE_JOBS = _LIVE_ROOT/'calibration/.manager/live-fusion-web'
+_LIVE_PY = _LIVE_ROOT/'venv/bin/python'
+_LIVE_CORE = _LIVE_ROOT/'manager/services/live_fusion_core_v23b.py'
+_LIVE_RUNNER = _LIVE_ROOT/'manager/services/live_fusion_web_runner.py'
+
+def _live_route(request):
+    values=request.get('presets')
+    if not isinstance(values,list) or len(values)!=3 or any(type(p)!=int or not 1<=p<=9 for p in values) or len(set(values))!=3:
+        raise ValueError('choose_exactly_three_distinct_presets_1_to_9')
+    return values
+
+def _live_preview(request):
+    presets=_live_route(request)
+    argv=[str(_LIVE_PY),str(_LIVE_CORE),'--presets',','.join(map(str,presets))]
+    try:
+        r=subprocess.run(argv,cwd=str(_LIVE_ROOT),stdin=subprocess.DEVNULL,
+                         stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                         text=True,timeout=50,check=False,
+                         env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1'))
+    except (OSError,subprocess.TimeoutExpired):
+        return response(False,error='preview_unavailable')
+    if r.returncode != 0:
+        return response(False,error='invalid_route_or_camera_preflight',
+                        reason='Incompatible adjacent Fusion presets, wrong LAB site mode, or Detection not active')
+    text=r.stdout
+    site=re.search(r'ACTIVE_SITE=\s*([A-Za-z0-9._-]+)',text)
+    rev=re.search(r'ACTIVE_REVISION=\s*(rev-[A-Za-z0-9._-]+)',text)
+    overlap=re.search(r'THEORETICAL_COMMON_FOV_DEG=\s*(-?[0-9]+(?:\.[0-9]+)?)',text)
+    hfov=re.search(r'HFOV_DEG=\s*([0-9.]+)',text)
+    if not site or not rev or not overlap:
+        return response(False,error='preflight_output_invalid')
+    return response(True,site_id=site.group(1),revision_id=rev.group(1),
+                    presets=presets,mode='LAB',
+                    theoretical_common_fov_deg=float(overlap.group(1)),
+                    hfov_deg=float(hfov.group(1)) if hfov else None,
+                    safe_to_start=True,
+                    actual_target_visibility_verified=False,
+                    theoretical_triple_overlap_predicted=float(overlap.group(1))>=5,
+                    warning=('LAB TEST ONLY: Angular 3-way overlap not predicted; real images must prove that all three presets see the stationary target. '
+                             if float(overlap.group(1)) < 5 else
+                             'LAB TEST ONLY: 3-way angular overlap predicted but target visibility still unverified. ')
+                            + 'Detection pauses during capture; Telegram disabled; not field calibration validation')
+
+def _live_start(request):
+    preview=_live_preview(request)
+    if not preview.get('ok'):
+        return preview
+    if request.get('site_id')!=preview['site_id'] or request.get('revision_id')!=preview['revision_id']:
+        return response(False,error='active_runtime_changed_since_preview')
+    _LIVE_JOBS.mkdir(parents=True,exist_ok=True)
+    gid=_live_grp.getgrnam('fire').gr_gid
+    os.chown(_LIVE_JOBS,0,gid)
+    os.chmod(_LIVE_JOBS,0o750)
+    lock=_LIVE_JOBS/'.launch.lock'
+    with open(lock,'a+b') as f:
+        fcntl.flock(f.fileno(),fcntl.LOCK_EX)
+        # A single camera owner per test. Refuse new launches if an older
+        # job has no completion report and its process is still alive.
+        for child in _LIVE_JOBS.iterdir():
+            if not child.is_dir() or not re.fullmatch(r'lf-[0-9a-f]{24}',child.name):
+                continue
+            meta=child/'meta.json'
+            if not meta.is_file() or (child/'finish.json').is_file():
+                continue
+            try:
+                past=json.loads(meta.read_text())
+                pid=int(past['pid'])
+                os.kill(pid,0)
+            except (OSError,ValueError,KeyError):
+                continue
+            return response(False,error='another_live_test_still_running',job_id=child.name)
+        job_id='lf-'+_live_secrets.token_hex(12)
+        job_dir=_LIVE_JOBS/job_id
+        job_dir.mkdir(mode=0o750)
+        os.chown(job_dir,0,gid)
+        os.chmod(job_dir,0o750)
+        log=job_dir/'run.log'
+        argv=[str(_LIVE_PY),str(_LIVE_RUNNER),'--job-id',job_id,
+              '--site-id',preview['site_id'],'--revision-id',preview['revision_id'],
+              '--presets',','.join(map(str,preview['presets']))]
+        fd=os.open(str(log),os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o640)
+        os.fchown(fd,0,gid)
+        meta={'job_id':job_id,'site_id':preview['site_id'],
+              'revision_id':preview['revision_id'],'presets':preview['presets'],
+              'pid':0,'started_at':datetime.now(timezone.utc).isoformat()}
+        p=job_dir/'meta.json'
+        p.write_text(json.dumps(meta)+'\n',encoding='utf-8')
+        os.chmod(p,0o640);os.chown(p,0,gid)
+        with os.fdopen(fd,'ab',buffering=0) as out:
+            process=subprocess.Popen(argv,cwd=str(_LIVE_ROOT),stdin=subprocess.DEVNULL,
+                         stdout=out,stderr=subprocess.STDOUT,
+                         start_new_session=True,
+                         env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1'))
+        meta['pid']=process.pid
+        tmp=job_dir/'meta.next'
+        tmp.write_text(json.dumps(meta)+'\n',encoding='utf-8')
+        os.chmod(tmp,0o640);os.chown(tmp,0,gid);os.replace(tmp,p)
+        return response(True,job_id=job_id,site_id=preview['site_id'],
+                        revision_id=preview['revision_id'],presets=preview['presets'],
+                        started=True,runtime_changed=False)
+
+
 def handle(
     request,
 ):
@@ -3641,6 +3800,12 @@ def handle(
         "action"
     )
 
+
+    if action == 'live_fusion_web_preview':
+        return _live_preview(request)
+
+    if action == 'live_fusion_web_start':
+        return _live_start(request)
 
     if action == "activate_revision":
 
