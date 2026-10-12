@@ -76,6 +76,8 @@ from manager.phase45_editor_api import phase45_editor_bp
 app.register_blueprint(phase45_editor_bp)
 from manager.site_settings_v24_api import site_settings_v24_bp
 app.register_blueprint(site_settings_v24_bp)
+from manager.active_camera_connection_v25_api import camera_v25_bp
+app.register_blueprint(camera_v25_bp)
 from manager.phase45_live_fusion_api import live_fusion_bp
 app.register_blueprint(live_fusion_bp)
 register_site_write_guard(app)
