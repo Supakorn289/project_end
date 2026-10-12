@@ -894,10 +894,10 @@ def wizard_geometry_mark(
     )
 
 
-    save_state(
-        site_id,
-        state,
-    )
+    # Geometry mark edits invalidate previously computed geometry evidence.
+    from manager.services.phase45_editor import invalidate_geometry_state
+    invalidate_geometry_state(state)
+    save_state(site_id, state)
 
 
     return ok(
@@ -941,18 +941,10 @@ def wizard_geometry_clear(
         site_id
     )
 
-    state[
-        "geometry"
-    ][
-        phase
-    ][
-        pair
-    ] = []
-
-    save_state(
-        site_id,
-        state,
-    )
+    state["geometry"][phase][pair] = []
+    from manager.services.phase45_editor import invalidate_geometry_state
+    invalidate_geometry_state(state)
+    save_state(site_id, state)
 
     return ok()
 

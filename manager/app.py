@@ -65,6 +65,21 @@ configure_session_security(
     app
 )
 
+from manager.runtime_site_v2_api import site_v2_bp
+from manager.services.site_lifecycle_v2 import register_site_write_guard
+app.register_blueprint(site_v2_bp)
+from manager.legacy_geometry_lab_api import legacy_geometry_lab_bp
+app.register_blueprint(legacy_geometry_lab_bp)
+from manager.site_notifications_v22_api import site_notification_v22_bp
+app.register_blueprint(site_notification_v22_bp)
+from manager.phase45_editor_api import phase45_editor_bp
+app.register_blueprint(phase45_editor_bp)
+from manager.site_settings_v24_api import site_settings_v24_bp
+app.register_blueprint(site_settings_v24_bp)
+from manager.phase45_live_fusion_api import live_fusion_bp
+app.register_blueprint(live_fusion_bp)
+register_site_write_guard(app)
+
 app.register_blueprint(
     settings_bp
 )

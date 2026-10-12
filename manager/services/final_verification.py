@@ -1256,6 +1256,12 @@ def verify_site_candidate(
     )
 
 
+    # A historical holdout PASS is not a fresh solver proof. A LAB-only
+    # operator-approved legacy trial is tracked separately and always WARNs.
+    from manager.services.legacy_geometry_lab import preview as _legacy_trial_preview
+    legacy_trial = _legacy_trial_preview(site_id)
+    lab_legacy_accepted = bool(mode == "LAB" and legacy_trial.get("accepted") is True)
+
     solver_geometry_accepted = bool(
         solver_result.get(
             "passed"
@@ -1273,7 +1279,7 @@ def verify_site_candidate(
             geometry_candidate
         )
         and
-        solver_geometry_accepted
+        (solver_geometry_accepted or lab_legacy_accepted)
     ):
 
         geometry_source = (
@@ -1306,6 +1312,9 @@ def verify_site_candidate(
         )
 
 
+    geometry_is_legacy_trial = bool(geometry_source == "candidate" and lab_legacy_accepted
+                                    and not solver_geometry_accepted)
+
     geometry_is_forced = bool(
         geometry_source
         ==
@@ -1327,7 +1336,7 @@ def verify_site_candidate(
 
         status=(
             "WARN"
-            if geometry_is_forced
+            if (geometry_is_forced or geometry_is_legacy_trial)
             else None
         ),
 
@@ -1337,6 +1346,12 @@ def verify_site_candidate(
                 "Independent Holdout = FAILED"
             )
             if geometry_is_forced
+            else
+            (
+                "LAB TRIAL ONLY: Historical Holdout evidence accepted; "
+                "not freshly solved or certified for Production"
+            )
+            if geometry_is_legacy_trial
             else
             (
                 (
@@ -1384,13 +1399,25 @@ def verify_site_candidate(
         )
 
 
+        if geometry_is_legacy_trial:
+            # Policy exception for a supervised LAB trial, NOT SHA provenance.
+            dependency_ok = True
+            dependency_status = "WARN"
+            geometry_intrinsics_hash = None
+
         dependency_detail = (
+            "LAB TRIAL ONLY: Intrinsics lineage unproven. "
+            "Requires independent solve/field validation before Production"
+            if geometry_is_legacy_trial
+            else
+            (
             "Geometry ใช้ Intrinsics Candidate ชุดเดียวกัน"
             if dependency_ok
             else
             (
                 "Geometry / Intrinsics fingerprint "
                 "ไม่ตรงกัน ต้อง Solve Geometry ใหม่"
+            )
             )
         )
 
@@ -1462,6 +1489,17 @@ def verify_site_candidate(
             geometry_source,
     )
 
+
+    if geometry_is_legacy_trial:
+        add(
+            "legacy_geometry_lab_trial",
+            "Historical Geometry LAB Trial",
+            required=False, ok=False, status="WARN",
+            detail=("Operator accepted historical 9-preset Holdout; "
+                    "intrinsics lineage and present-day field accuracy are NOT proven. "
+                    "Not for operational fire-safety reliance or Production."),
+            source="explicit-lab-trial-review",
+        )
 
     # ========================================================
     # True North
@@ -1635,6 +1673,37 @@ def verify_site_candidate(
     # ========================================================
     # Candidate result
     # ========================================================
+
+    # Phase 4: landmarks changed => historical geometry and trial are stale.
+    # Only a fresh solver result tied to the current Intrinsics may lift this.
+    phase45_dirty = bool(state.get("phase45_geometry_dirty"))
+    phase45_fresh_solve = bool(
+        solver_result.get("passed") is True
+        and solver_result.get("intrinsics_sha256")
+        and solver_result.get("intrinsics_sha256") == intrinsics_hash
+    )
+    if phase45_dirty:
+        add("phase45_landmark_reverification", "Edited landmark verification",
+            required=True, ok=phase45_fresh_solve,
+            detail=("Fresh solver result verified after changes" if phase45_fresh_solve
+                    else "Landmarks edited: rerun Geometry Prepare/Solve and verify before Publish"),
+            source="phase45-working-copy")
+
+    from manager.services.site_settings_v24 import FILENAME, resolve_artifact
+    settings_path = CANDIDATE_DIR / site_id / FILENAME
+    if settings_path.exists() or settings_path.is_symlink():
+        try:
+            if settings_path.is_symlink() or settings_path.stat().st_size > 16384:
+                raise ValueError("unsafe settings file")
+            values = json.loads(settings_path.read_text(encoding="utf-8"))
+            resolve_artifact(values)
+            settings_ok = True
+        except (OSError, ValueError, TypeError):
+            settings_ok = False
+        add("site_detection_settings", "Site-specific Detection Settings",
+            required=True, ok=settings_ok,
+            detail="Validated site-scoped values" if settings_ok else "Invalid site-scoped detection settings",
+            source="working-copy")
 
     candidate_ready = (
         len(

@@ -412,6 +412,41 @@ def create_revision(
         )
 
 
+        # LEGACY_LAB_EVIDENCE_V214: authenticated LAB review includes 9 photos.
+        lab_record_file = CANDIDATE_DIR / site_id / 'legacy_geometry_lab_trial.json'
+        if lab_record_file.exists() or lab_record_file.is_symlink():
+            from manager.services.legacy_geometry_lab import preview as _trial_preview
+            if lab_record_file.is_symlink() or not lab_record_file.is_file():
+                raise RuntimeError('legacy_trial_unsafe_record')
+            review = _trial_preview(site_id)
+            if review.get('accepted') is not True or review.get('lab_only') is not True or review.get('ptz_captures') != 9:
+                raise RuntimeError('legacy_trial_evidence_not_accepted')
+            trial_record = json.loads(lab_record_file.read_text(encoding='utf-8'))
+            digests = trial_record.get('files_sha256') or {}
+            candidate_root = CANDIDATE_DIR / site_id
+            photo_dir = candidate_root / 'ptz_captures' / 'main'
+            if (candidate_root.is_symlink() or photo_dir.parent.is_symlink() or
+                photo_dir.is_symlink() or not photo_dir.is_dir()):
+                raise RuntimeError('legacy_trial_unsafe_photo_dir')
+            for index in range(1,10):
+                rel = f'ptz_captures/main/preset_{index}.jpg'
+                photo = candidate_root / rel
+                digest = digests.get(rel)
+                if (not photo.is_file() or photo.is_symlink() or
+                    not isinstance(digest,str) or len(digest)!=64 or
+                    not 1024 <= photo.stat().st_size <= 15*1024*1024 or
+                    _sha256(photo)!=digest):
+                    raise RuntimeError('legacy_trial_image_missing_or_modified: '+rel)
+                candidate_files.append(photo)
+            for rel,digest in digests.items():
+                artifact = candidate_root / rel
+                if (not isinstance(digest,str) or len(digest)!=64 or
+                    not artifact.is_file() or artifact.is_symlink() or
+                    any(part.is_symlink() for part in artifact.parents if part != candidate_root and candidate_root in part.parents) or
+                    _sha256(artifact)!=digest):
+                    raise RuntimeError('legacy_trial_dependency_changed: '+rel)
+            candidate_files=sorted(candidate_files)
+
         file_manifest = []
 
         fallback_files = []
@@ -426,6 +461,18 @@ def create_revision(
             for path
             in candidate_files
         }
+
+        if verification.get("candidate_ready") is True:
+            required = {
+                "camera_connection.json", "camera_intrinsics.json",
+                "distance_global.json", "preset_rotation.json", "site.json",
+            }
+            missing = sorted(required - candidate_relative)
+            if missing:
+                raise RuntimeError(
+                    "VALIDATED_REVISION_REQUIRES_SITE_OWNED_ARTIFACTS: "
+                    + ", ".join(missing)
+                )
 
 
         for path in candidate_files:
@@ -453,50 +500,11 @@ def create_revision(
             })
 
 
-        # A deployable revision must not depend on
-        # whatever happens to be Active later.
-        for relative_name, active_path in (
-            ACTIVE_ARTIFACT_FALLBACKS.items()
-        ):
-
-            if relative_name in candidate_relative:
-                continue
-
-
-            if not (
-                active_path.exists()
-                or
-                active_path.is_symlink()
-            ):
-
-                continue
-
-
-            fallback_files.append(
-                (
-                    Path(
-                        relative_name
-                    ),
-                    active_path,
-                )
-            )
-
-
-            file_manifest.append({
-                "path":
-                    relative_name,
-
-                "sha256":
-                    _sha256(
-                        active_path
-                    ),
-
-                "size":
-                    active_path.stat().st_size,
-
-                "source":
-                    "active-runtime-fallback",
-            })
+        # SECURITY: never pull artifacts from Global Active Runtime while
+        # preparing an arbitrary Site. Every Site must provide its own
+        # Candidate artifacts, or use explicit validated Legacy Recovery.
+        # No implicit cross-site calibration inheritance.
+        fallback_files = []
 
 
         digest_input = {
@@ -846,6 +854,14 @@ def create_revision(
                         ]
                     )
 
+
+            # Legacy LAB trial must be complete before immutable commit.
+            if (artifacts_dir / 'legacy_geometry_lab_trial.json').is_file():
+                from manager.services.legacy_geometry_lab import revision_lab_trial_guard
+                site_mode = str((record or {}).get('mode') or '').upper()
+                error = revision_lab_trial_guard(temp_dir, site_id, site_mode, site_mode)
+                if error:
+                    raise RuntimeError('legacy_trial_precommit_rejected: '+error)
 
             temp_dir.chmod(
                 0o750

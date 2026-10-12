@@ -162,12 +162,15 @@ def _working_copy_info(
 
     exists = bool(
         working
-        and
-        working.get("state")
+        and working.get("state") in {
+            "EDITING", "CAMERA_CHANGED", "READY_FOR_VERIFICATION",
+            "CAMERA_TEST_FAILED", "RECOVERY_EDITING",
+        }
     )
 
     return {
         "exists": exists,
+        "candidate_exists": bool(candidate.exists() and any(candidate.iterdir())),
         "state": working.get("state"),
         "parent_revision": working.get("parent_revision"),
         "published_revision": working.get("published_revision"),
@@ -175,7 +178,7 @@ def _working_copy_info(
         "camera_test_required": working.get("camera_test_required"),
         "camera_test_passed": working.get("camera_test_passed"),
         "camera": (
-            _camera_summary_from_file(camera)
+            _camera_summary(camera)
             if exists and camera.exists()
             else {"configured": False}
         ),
@@ -196,7 +199,14 @@ def _revision_entry(site_id: str, data: dict, active_site, active_revision) -> d
         "source_exists": source.exists(),
         "deployment_exists": deployed.exists(),
         "camera": _camera_summary(camera_file) if camera_file.exists() else {"configured": False},
-        "geometry": _geometry_summary(rotation_file) if rotation_file.exists() else {},
+        "geometry": (
+            {**_geometry_summary(rotation_file),
+             "runtime_status": (
+                 "FORCED_ACTIVE" if is_active and _geometry_summary(rotation_file).get("forced")
+                 else "ACTIVE" if is_active else "INACTIVE"
+             )}
+            if rotation_file.exists() else {}
+        ),
     }
 
 
@@ -262,7 +272,7 @@ def inventory() -> dict:
             "active_revision_id": active_revision if is_active else None,
             "deletable": not is_active,
             "site_id_mutable": False,
-            "working_copy": _working_copy_info(site_id, record),
+            "working_copy": _working_copy_info(site_id),
             "revisions": revisions,
         })
 
@@ -378,8 +388,21 @@ def preview_site_update(site_id: str, payload: dict) -> dict:
 
 def update_site_record(site_id: str, payload: dict) -> dict:
     site_id = _site_id(site_id)
+    from manager.services.site_lifecycle_v2 import _active, _registry
+    if site_id != _active()[0]:
+        record = _registry(site_id)
+        source = REVISION_ROOT / site_id
+        if source.exists() and any(p.is_dir() for p in source.iterdir()):
+            raise PermissionError("site_read_only: only active Site metadata can be edited")
     normalized = _normalized_update(site_id, payload)
     preview = preview_site_update(site_id, payload)
+    if preview.get("risk") == "HIGH":
+        record = site_registry.list_registered_sites().get("sites", {}).get(site_id, {})
+        working = record.get("working_copy") or {}
+        if working.get("state") not in {
+            "EDITING", "CAMERA_CHANGED", "READY_FOR_VERIFICATION", "CAMERA_TEST_FAILED",
+        }:
+            raise PermissionError("High-risk Site metadata requires Active Working Copy")
 
     def mutate(registry: dict):
         site = registry["sites"].get(site_id)
@@ -485,6 +508,9 @@ def create_working_copy(
 ) -> dict:
     site_id = _site_id(site_id)
     revision_id = _revision_id(revision_id)
+    from manager.services.site_lifecycle_v2 import _active
+    if (site_id, revision_id) != _active():
+        raise PermissionError("only_the_current_active_revision_can_be_edited")
     source = _source_revision_dir(site_id, revision_id)
     if not source.exists():
         raise FileNotFoundError("revision not found")
@@ -492,6 +518,12 @@ def create_working_copy(
     artifacts = source / "artifacts"
     if not artifacts.is_dir():
         raise RuntimeError("revision artifacts missing")
+    from manager.services.site_lifecycle_v2 import check_revision_source_integrity
+    check_revision_source_integrity(site_id, revision_id)
+    if not (artifacts / "camera_connection.json").is_file():
+        raise RuntimeError("revision camera config missing: use Setup Wizard")
+    if site_id not in site_registry.list_registered_sites().get("sites", {}):
+        raise KeyError("site not registered")
 
     candidate = CANDIDATE_DIR / site_id
     if candidate.exists() and any(candidate.iterdir()) and not overwrite:
@@ -512,6 +544,13 @@ def create_working_copy(
         path.chmod(0o600 if path.name in SECRET_ARTIFACTS else 0o640)
 
     snapshot = source / "wizard_state.json"
+    wizard_path = STATE_DIR / f"{site_id}.json"
+    if wizard_path.exists():
+        wizard_backup_dir = TRASH_ROOT / "wizard-backups" / site_id
+        wizard_backup_dir.mkdir(parents=True, exist_ok=True)
+        wizard_backup = wizard_backup_dir / f"{_stamp()}-{os.getpid()}.json"
+        shutil.copy2(wizard_path, wizard_backup)
+        wizard_backup.chmod(0o600)
     state = _read_json(snapshot, {}) if snapshot.exists() else load_state(site_id)
     state["draft_parent_revision"] = revision_id
     state["draft_started_at"] = _now()
@@ -554,8 +593,40 @@ def create_working_copy(
     }
 
 
+def _require_editable_working_copy(site_id: str) -> dict:
+    record = site_registry.list_registered_sites().get("sites", {}).get(site_id)
+    if not record:
+        raise KeyError("site not registered")
+    working = record.get("working_copy") or {}
+    if working.get("state") not in {
+        "EDITING", "CAMERA_CHANGED", "READY_FOR_VERIFICATION",
+        "CAMERA_TEST_FAILED", "RECOVERY_EDITING",
+    }:
+        raise RuntimeError("working_copy_not_editable: create a working copy first")
+    from manager.services.site_lifecycle_v2 import _active
+    if site_id != _active()[0] and not working.get("recovery"):
+        raise PermissionError("inactive site draft is now read-only")
+    return working
+
+
+def get_working_copy_detail(site_id: str) -> dict:
+    site_id = _site_id(site_id)
+    working = _require_editable_working_copy(site_id)
+    camera = CANDIDATE_DIR / site_id / "camera_connection.json"
+    return {
+        "ok": True,
+        "site_id": site_id,
+        "parent_revision": working.get("parent_revision"),
+        "state": working.get("state"),
+        "camera_test_required": working.get("camera_test_required"),
+        "camera_test_passed": working.get("camera_test_passed"),
+        "camera": _camera_summary(camera) if camera.exists() else {"configured": False},
+        "runtime_changed": False,
+    }
+
 def update_working_camera(site_id: str, payload: dict) -> dict:
     site_id = _site_id(site_id)
+    _require_editable_working_copy(site_id)
     candidate = CANDIDATE_DIR / site_id / "camera_connection.json"
     if not candidate.exists():
         raise RuntimeError("working copy camera configuration missing")
@@ -630,13 +701,14 @@ def update_working_camera(site_id: str, payload: dict) -> dict:
         ],
         "warnings": [
             "Active Runtime ยังไม่เปลี่ยนจนกว่าจะ Activate Revision ใหม่",
-            "การเปลี่ยน IP/credential ไม่ทำลาย calibration แต่ต้อง Test Camera/RTSP ใหม่",
+            "ถ้าเปลี่ยนเฉพาะ IP ของกล้องเดิม ให้ Test Camera/RTSP ใหม่; ถ้าเปลี่ยนตัวกล้อง เลนส์หรือตำแหน่งติดตั้ง ต้อง Recalibrate Intrinsics, Geometry และ Distance ตามผลกระทบ",
         ],
     }
 
 
 def test_working_camera(site_id: str) -> dict:
     site_id = _site_id(site_id)
+    _require_editable_working_copy(site_id)
     with hardware_lock(f"runtime-site-crud:camera-test:{site_id}", timeout=1.0):
         result = test_camera_candidate(site_id)
 
@@ -666,12 +738,15 @@ def test_working_camera(site_id: str) -> dict:
 
 def publish_working_copy(site_id: str) -> dict:
     site_id = _site_id(site_id)
-    registry = site_registry.list_registered_sites()
-    site = registry.get("sites", {}).get(site_id, {})
-    working = site.get("working_copy", {}) or {}
-
-    if not working:
-        raise RuntimeError("working copy not found")
+    # LAB_REPUBLISH_GUARD_V214: only repair a known validated, incomplete
+    # immutable trial. All other PUBLISHED working copies remain read-only.
+    from manager.services.legacy_geometry_lab import published_lab_repair_allowed
+    source = site_registry.list_registered_sites().get('sites', {}).get(site_id) or {}
+    published_repair = published_lab_repair_allowed(site_id, source.get('working_copy') or {})
+    if published_repair:
+        working = source['working_copy']
+    else:
+        working = _require_editable_working_copy(site_id)
     if working.get("camera_test_required") is True:
         raise RuntimeError("camera test required before publish")
 
@@ -687,6 +762,14 @@ def publish_working_copy(site_id: str) -> dict:
         }
 
     revision_id = result.get("revision_id")
+    if published_repair:
+        from manager.services.legacy_geometry_lab import revision_lab_trial_guard
+        from manager.services.revision_engine import REVISION_ROOT
+        new_revision = REVISION_ROOT / site_id / revision_id
+        if (result.get('existing') or result.get('status') != 'VALIDATED_CANDIDATE' or
+            result.get('artifact_count') != 15 or
+            revision_lab_trial_guard(new_revision, site_id, 'LAB', 'LAB') is not None):
+            raise RuntimeError('legacy_trial_republish_postcheck_failed')
 
     def mutate(registry: dict):
         target = registry["sites"].get(site_id)
@@ -710,6 +793,7 @@ def publish_working_copy(site_id: str) -> dict:
 
 def discard_working_copy(site_id: str) -> dict:
     site_id = _site_id(site_id)
+    _require_editable_working_copy(site_id)
     candidate = CANDIDATE_DIR / site_id
     archived = None
     if candidate.exists() and any(candidate.iterdir()):
@@ -756,14 +840,62 @@ def activate_site_revision(site_id: str, revision_id: str) -> dict:
     return {**result, "plan": plan}
 
 
+def _runtime_pointer_guards() -> tuple[set[str], set[tuple[str, str]], bool]:
+    """Return (protected sites, protected revisions, uncertain state)."""
+    files = (
+        CALIBRATION_ROOT / "preset_rotation_ACTIVE.json",
+        CALIBRATION_ROOT / "camera_intrinsics.json",
+        CALIBRATION_ROOT / "distance_global.json",
+        CALIBRATION_ROOT / "site.json",
+    )
+    sites: set[str] = set()
+    revisions: set[tuple[str, str]] = set()
+    uncertain = False
+    for file in files:
+        if not file.is_symlink():
+            if file.exists():
+                # An old regular runtime file is not an active revision pointer.
+                continue
+            # Missing required active pointer: do not delete managed calibration.
+            uncertain = True
+            continue
+        if not file.exists():
+            uncertain = True
+            continue
+        resolved = file.resolve()
+        try:
+            parts = resolved.relative_to(DEPLOY_ROOT.resolve()).parts
+        except ValueError:
+            uncertain = True
+            continue
+        if parts:
+            sites.add(parts[0])
+        if len(parts) >= 4 and parts[1] == "revisions":
+            revisions.add((parts[0], parts[2]))
+    active_site, active_revision = _active_identity()
+    if active_site:
+        sites.add(active_site)
+        if active_revision:
+            revisions.add((active_site, active_revision))
+    elif sites or revisions:
+        uncertain = True
+    return sites, revisions, uncertain
+
+
 def revision_delete_preview(site_id: str, revision_id: str) -> dict:
     site_id = _site_id(site_id)
     revision_id = _revision_id(revision_id)
     active_site, active_revision = _active_identity()
-    active = site_id == active_site and revision_id == active_revision
+    protected_sites, protected_revisions, uncertain = _runtime_pointer_guards()
+    active = (site_id, revision_id) in protected_revisions or (
+        site_id == active_site and revision_id == active_revision
+    )
     source = _source_revision_dir(site_id, revision_id)
     deployed = _deployment_revision_dir(site_id, revision_id)
     exists = source.exists() or deployed.exists()
+    permitted = not uncertain and not active
+    if deployed.exists() and not os.access(deployed.parent, os.W_OK):
+        permitted = False
 
     return {
         "ok": True,
@@ -771,7 +903,13 @@ def revision_delete_preview(site_id: str, revision_id: str) -> dict:
         "revision_id": revision_id,
         "exists": bool(exists),
         "active": active,
-        "deletable": bool(exists and not active),
+        "deletable": bool(exists and permitted),
+        "blocked_reason": (
+            "active_revision" if active else
+            "runtime_pointers_uncertain" if uncertain else
+            "deployment_requires_privileged_cleanup"
+            if deployed.exists() and not os.access(deployed.parent, os.W_OK) else None
+        ),
         "source_exists": source.exists(),
         "deployment_exists": deployed.exists(),
         "delete_mode": "MOVE_TO_TRASH",
@@ -789,6 +927,11 @@ def revision_delete_preview(site_id: str, revision_id: str) -> dict:
 
 
 def delete_revision(site_id: str, revision_id: str, confirm_value: str) -> dict:
+    with hardware_lock(f"delete-revision:{site_id}:{revision_id}", timeout=2.0):
+        return _delete_revision_locked(site_id, revision_id, confirm_value)
+
+
+def _delete_revision_locked(site_id: str, revision_id: str, confirm_value: str) -> dict:
     preview = revision_delete_preview(site_id, revision_id)
     if confirm_value != revision_id:
         raise ValueError("confirmation mismatch")
@@ -852,7 +995,8 @@ def delete_revision(site_id: str, revision_id: str, confirm_value: str) -> dict:
 def site_delete_preview(site_id: str) -> dict:
     site_id = _site_id(site_id)
     active_site, _ = _active_identity()
-    active = site_id == active_site
+    protected_sites, _, uncertain = _runtime_pointer_guards()
+    active = site_id == active_site or site_id in protected_sites
     registry = site_registry.list_registered_sites()
     registered = site_id in (registry.get("sites", {}) or {})
     revisions = REVISION_ROOT / site_id
@@ -879,7 +1023,16 @@ def site_delete_preview(site_id: str) -> dict:
         "site_id": site_id,
         "exists": bool(exists),
         "active": active,
-        "deletable": bool(exists and not active),
+        "deletable": bool(
+            exists and not active and not uncertain and
+            (not deployed.exists() or os.access(deployed.parent, os.W_OK))
+        ),
+        "blocked_reason": (
+            "active_site" if active else
+            "runtime_pointers_uncertain" if uncertain else
+            "deployment_requires_privileged_cleanup"
+            if deployed.exists() and not os.access(deployed.parent, os.W_OK) else None
+        ),
         "revision_count": revision_count,
         "has_candidate": candidate.exists(),
         "has_deployment": deployed.exists(),
@@ -898,6 +1051,11 @@ def site_delete_preview(site_id: str) -> dict:
 
 
 def delete_site(site_id: str, confirm_value: str) -> dict:
+    with hardware_lock(f"delete-site:{site_id}", timeout=2.0):
+        return _delete_site_locked(site_id, confirm_value)
+
+
+def _delete_site_locked(site_id: str, confirm_value: str) -> dict:
     site_id = _site_id(site_id)
     preview = site_delete_preview(site_id)
     if confirm_value != site_id:

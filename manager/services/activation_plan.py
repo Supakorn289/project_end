@@ -552,6 +552,15 @@ def build_activation_plan(
         )
 
 
+    from manager.services.legacy_geometry_lab import revision_lab_trial_guard
+    from manager.services.site_registry import list_registered_sites
+    current_mode = str((list_registered_sites().get("sites", {}).get(site_id) or {}).get("mode") or "LAB").upper()
+    lab_trial_error = revision_lab_trial_guard(revision_dir, site_id, mode, current_mode)
+    if lab_trial_error:
+        return {"ok": False, "activatable": False, "site_id": site_id,
+                "revision_id": revision_id, "error": lab_trial_error,
+                "runtime_changed": False}
+
     env = {}
 
 
@@ -636,6 +645,17 @@ def build_activation_plan(
             )
         )
 
+
+    # SITE_V24_SETTINGS: old revisions take explicit contract-compatible
+    # defaults, never accidentally inherit another Site's runtime settings.
+    from manager.services.site_settings_v24 import DEFAULTS, FILENAME, resolve_artifact
+    detection_settings_file = artifacts_dir / FILENAME
+    if detection_settings_file.is_symlink():
+        raise ValueError('unsafe_detection_settings_artifact')
+    if detection_settings_file.is_file():
+        env.update(resolve_artifact(_read_json(detection_settings_file)))
+    else:
+        env.update(DEFAULTS)
 
     coords = _coordinates(
         site_record
@@ -863,6 +883,12 @@ def build_activation_plan(
 
         "secret_status":
             secrets_present,
+
+        "legacy_lab_trial": (artifacts_dir / "legacy_geometry_lab_trial.json").is_file(),
+        "safety_warning": (
+            "LAB TRIAL ONLY: historical geometry; intrinsic lineage and field accuracy unproven"
+            if (artifacts_dir / "legacy_geometry_lab_trial.json").is_file() else None
+        ),
 
         "run_full_sweep":
             (

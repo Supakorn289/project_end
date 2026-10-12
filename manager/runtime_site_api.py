@@ -7,6 +7,7 @@ from manager.services.runtime_site_crud import (
     activate_site_revision,
     create_site_record,
     create_working_copy,
+    get_working_copy_detail,
     delete_revision,
     delete_site,
     discard_working_copy,
@@ -36,6 +37,7 @@ def _error(exc, status=400):
 
 
 @runtime_site_bp.get("/api/runtime-sites")
+@require_manager_session
 def runtime_sites_list():
     try:
         return jsonify(inventory())
@@ -75,6 +77,7 @@ def runtime_site_update(site_id):
 
 
 @runtime_site_bp.get("/api/runtime-sites/<site_id>/revision/<revision_id>")
+@require_manager_session
 def runtime_revision_detail(site_id, revision_id):
     try:
         return jsonify(revision_detail(site_id, revision_id))
@@ -122,6 +125,15 @@ def runtime_revision_working_copy(site_id, revision_id):
             exc,
             409 if "working_copy_exists" in str(exc) else 400,
         )
+
+
+@runtime_site_bp.get("/api/runtime-sites/<site_id>/working-copy")
+@require_manager_session
+def runtime_working_copy_detail(site_id):
+    try:
+        return jsonify(get_working_copy_detail(site_id))
+    except Exception as exc:
+        return _error(exc, 409)
 
 
 @runtime_site_bp.patch("/api/runtime-sites/<site_id>/working-copy/camera")

@@ -392,8 +392,12 @@
     installScrollFix();
 
     try {
-      await loadSession();
-      await refresh();
+      const auth = await loadSession();
+      if (auth.authenticated) {
+        await refresh();
+      } else {
+        msg("Manager LOCKED — Unlock ด้านบนเพื่อแสดง Site / Runtime", "warn");
+      }
     } catch (e) {
       msg(String(e), "warn");
     }

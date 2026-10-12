@@ -55,6 +55,7 @@ async function unlock() {
     $("rsm-token").value = "";
     await session();
     out("Manager unlocked");
+    window.location.reload();
   } catch (e) { out(String(e)); }
 }
 
@@ -250,16 +251,27 @@ async function activateRevision(site, rev) {
 async function openRuntimeEditor(site, rev) {
   const s = await session();
   if (!s.authenticated) return out("Manager LOCKED");
-  let overwrite = false;
   const current = findSite(site);
-  if (current?.working_copy?.exists) {
-    overwrite = confirm(`Site ${site} มี Working Copy อยู่แล้ว\n\nOK = Archive ของเดิมแล้วเริ่มจาก ${rev}`);
-    if (!overwrite) return;
-  }
   try {
-    const r = await req(`/api/runtime-sites/${encodeURIComponent(site)}/revision/${encodeURIComponent(rev)}/working-copy`, {
-      method:"POST", body:JSON.stringify({overwrite}),
-    });
+    let r;
+    const working = current?.working_copy || {};
+    if (working.exists && working.parent_revision === rev) {
+      // Reopen unfinished edits without resetting candidate artifacts or test state.
+      r = await req(`/api/runtime-sites/${encodeURIComponent(site)}/working-copy`);
+    } else {
+      let overwrite = false;
+      if (working.exists || working.candidate_exists) {
+        overwrite = confirm(
+          `Site ${site} มี Candidate หรือ Working Copy เดิมอยู่\n\n` +
+          `OK = Archive ข้อมูลเดิมอย่างปลอดภัย แล้วเริ่มแก้ ${rev}\n` +
+          `Cancel = ไม่เขียนทับข้อมูลเดิม`
+        );
+        if (!overwrite) return;
+      }
+      r = await req(`/api/runtime-sites/${encodeURIComponent(site)}/revision/${encodeURIComponent(rev)}/working-copy`, {
+        method:"POST", body:JSON.stringify({overwrite}),
+      });
+    }
     workingSite = site;
     $("rsm-working-site").textContent = site;
     $("rsm-working-parent").textContent = rev;

@@ -1,0 +1,5 @@
+#rsm-v2-tools {border:1px solid rgba(75,147,225,.5)}
+#rsm-v2-tools .rsm-actions {margin:12px 0;flex-wrap:wrap}
+#rsm-v2-tools .rsm-warning {margin:12px 0}
+#rsm-v2-status {white-space:pre-wrap;max-height:320px;overflow:auto}
+#rsm-v2-tools .rsm-btn:disabled {opacity:.45;cursor:not-allowed}
