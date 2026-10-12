@@ -1,0 +1,50 @@
+#sf27{border-top:1px solid rgba(148,163,184,.3);margin-top:22px;padding-top:20px;color:#e2e8f0}
+#sf27 *{box-sizing:border-box}
+#sf27 .sf27-header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
+#sf27 h3{font-size:19px;line-height:1.25;margin:0 0 5px}
+#sf27 h3 small{font-size:12px;color:#b3c8ed}
+#sf27 h4{font-size:15px;margin:0 0 10px}
+#sf27 p{font-size:13px;line-height:1.6}
+#sf27 .sf27-header p{margin:0;color:#a8bbd1}
+#sf27 button{min-height:42px;padding:9px 13px;cursor:pointer;border-radius:8px;border:1px solid #64748b;background:#253850;color:#f8fafc;font-size:13px;font-family:inherit}
+#sf27 button:disabled{opacity:.38;cursor:not-allowed}
+#sf27 button:focus-visible,#sf27 input:focus-visible,#sf27 select:focus-visible,#sf27 summary:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+#sf27 .sf27-id{display:flex;flex-direction:column;gap:6px;padding:13px;border-radius:9px;border:1px solid #425879;background:#172436;font-size:12px;overflow-wrap:anywhere}
+#sf27 .sf27-id b{font-size:14px;color:#e2f4ff}
+#sf27 #sf27-dirty{color:#fcd590}
+#sf27 .sf27-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+#sf27 .sf27-card{border:1px solid rgba(148,163,184,.23);padding:12px;background:#131e2e;border-radius:9px;min-width:0}
+#sf27 .sf27-card h4{color:#bfdbfe}
+#sf27 .sf27-data-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid rgba(148,163,184,.12);font-size:12px;overflow-wrap:anywhere}
+#sf27 .sf27-data-row span{color:#9db2c9;flex:1}
+#sf27 .sf27-data-row strong{font-size:12px;flex:1;text-align:right;font-weight:500}
+#sf27 .sf27-details{border:1px solid rgba(148,163,184,.24);padding:12px;border-radius:9px;margin:12px 0}
+#sf27 .sf27-details summary{cursor:pointer;font-size:13px;font-weight:600;color:#c8d8ef}
+#sf27 pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;background:#0c1420;color:#e5e7eb;font-size:12px;padding:12px}
+#sf27 .sf27-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 18px}
+#sf27 .sf27-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+#sf27 .sf27-box{border:1px solid rgba(148,163,184,.25);background:rgba(15,25,40,.58);border-radius:10px;padding:14px;min-width:0}
+#sf27 .sf27-box>p{margin:8px 0}
+#sf27 .sf27-marks{max-height:220px;overflow:auto;border:1px solid rgba(148,163,184,.25);border-radius:8px;margin-bottom:10px}
+#sf27 .sf27-mark-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border-bottom:1px solid rgba(148,163,184,.1)}
+#sf27 .sf27-mark-row:last-child{border-bottom:0}
+#sf27 .sf27-mark-row span{font-size:12px;line-height:1.45;overflow-wrap:anywhere;min-width:0}
+#sf27 .sf27-mark-row button{flex-shrink:0}
+#sf27 .sf27-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+#sf27 .sf27-field,#sf27 .sf27-form label{display:flex;flex-direction:column;gap:5px;color:#b5c9de;font-size:12px}
+#sf27 input,#sf27 select{width:100%;min-width:0;background:#172436;border:1px solid #6a7f99;color:#f9fafb;border-radius:7px;padding:10px;font-size:14px;min-height:42px}
+#sf27 .sf27-buttons{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+#sf27 .sf27-danger{border-color:#bb6060;color:#fecaca}
+#sf27 #sf27-settings-save{margin-top:14px}
+#sf27 .sf27-warning{color:#f4be78}
+#sf27 .sf27-status{border-radius:9px;padding:12px;background:#24354d;margin:16px 0;overflow-wrap:anywhere}
+#sf27 .sf27-status[data-kind=success]{color:#86efac}
+#sf27 .sf27-status[data-kind=error]{color:#fca5a5}
+#sf27 .sf27-footer{color:#aab9cc;border-top:1px solid rgba(148,163,184,.25);padding-top:13px}
+#sf27-advanced{border:1px solid rgba(148,163,184,.2);padding:13px;border-radius:10px;margin:18px 0}
+#sf27-advanced>summary{cursor:pointer;color:#adc8ee;font-size:13px}
+#sf27-advanced>*{max-width:100%}
+#sfw26-legacy{display:none}
+@media(max-width:980px){#sf27 .sf27-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){#sf27 .sf27-columns{grid-template-columns:1fr}#sf27 .sf27-header{align-items:stretch;flex-direction:column}#sf27 .sf27-toolbar{display:grid;grid-template-columns:1fr}#sf27 .sf27-cards{grid-template-columns:1fr}}
+@media(max-width:410px){#sf27 .sf27-form{grid-template-columns:1fr}#sf27 .sf27-mark-row{align-items:flex-start;flex-direction:column}#sf27 .sf27-mark-row button{width:100%}}

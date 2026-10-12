@@ -254,11 +254,76 @@ def _active_settings_trial_preview(site_id):
         return None
 
 
+
+def _active_camera_trial_preview(site_id):
+    """V25: *connection-only* change to same-camera LAB evidence.
+
+    Requires successful Camera Test, current Active source integrity, immutable
+    calibration/photos, and operator attestation. Never certifies new geometry.
+    """
+    try:
+        from manager.services.active_camera_connection_v25 import _allowed_maintenance, _sha, _read
+        site_id = site_registry._validate_site_id(site_id)
+        active_site, active_rev = _active()
+        if site_id != active_site or not active_rev:
+            return None
+        rec = _registry(site_id)
+        working = rec.get('working_copy') or {}
+        if (working.get('parent_revision') != active_rev or
+            working.get('recovery') is True or
+            str(rec.get('mode') or '').upper() != 'LAB'):
+            return None
+        if check_revision_source_integrity(site_id, active_rev).get('ok') is not True:
+            return None
+        source = REVISION_ROOT / site_id / active_rev
+        rev_meta = _read(source / 'revision.json')
+        if rev_meta.get('status') != 'VALIDATED_CANDIDATE' or rev_meta.get('candidate_ready') is not True:
+            return None
+        if revision_lab_trial_guard(source, site_id, 'LAB', 'LAB') is not None:
+            return None
+        artifacts, draft, old, current = _allowed_maintenance(site_id, active_rev, rec, working)
+        att = current.get('connection_maintenance') or {}
+        required_acks = ('same_physical_camera_ack', 'installation_unchanged_ack',
+                         'explicit_lab_only_ack', 'camera_test_passed')
+        if (att.get('parent_revision') != active_rev or
+            att.get('source_camera_sha256') != _sha(artifacts / 'camera_connection.json') or
+            att.get('candidate_camera_sha256') != _sha(draft / 'camera_connection.json') or
+            any(att.get(key) is not True for key in required_acks) or
+            not isinstance(att.get('ack_at'), str) or not att.get('ack_at')):
+            return None
+        old_dig = old.get('files_sha256') or {}
+        new_dig = current.get('files_sha256') or {}
+        if (set(new_dig) != set(old_dig) or
+            new_dig.get('camera_connection.json') != att['candidate_camera_sha256'] or
+            any(new_dig.get(k) != v for k,v in old_dig.items() if k != 'camera_connection.json')):
+            return None
+        geom = _read(draft / 'preset_rotation.json')
+        gate = geom.get('independent_holdout_gate') or {}
+        pairs = gate.get('pairs') or {}
+        if gate.get('passed') is not True or len(pairs) < 8 or not all(v is True for v in pairs.values()):
+            return None
+        return {
+            'ok':True,'eligible':True,'accepted':True,
+            'site_id':site_id,'parent_revision':active_rev,
+            'holdout_pairs':len(pairs),'ptz_captures':9,
+            'lab_only':True,'intrinsics_lineage_proven':False,
+            'inherited_active_lab_trial':True,'connection_only':True,
+            'warning':('LAB-only same-camera connection maintenance. Operator asserts unchanged camera, '
+                       'lens and mount; this is not independently verified or Production certified.')
+        }
+    except (ValueError, KeyError, TypeError, OSError, RuntimeError,
+            PermissionError, AttributeError, ImportError):
+        return None
+
+
 def preview(site_id):
     """Read-only preview after existing wizard state is present."""
     try:
         evidence = _evidence(site_id)
     except (ValueError, KeyError, FileNotFoundError, PermissionError, RuntimeError, OSError) as exc:
+        inherited_camera = _active_camera_trial_preview(site_id)
+        if inherited_camera is not None:
+            return inherited_camera
         inherited = _active_settings_trial_preview(site_id)
         if inherited is not None:
             return inherited
