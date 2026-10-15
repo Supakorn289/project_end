@@ -280,6 +280,13 @@ def save_camera_candidate(
     site_id,
     **kwargs,
 ):
+    # A legacy Save endpoint must not overwrite an isolated offline draft.
+    # Such edits must use the revision-scoped, digest-guarded Camera PATCH.
+    from manager.services import site_registry
+    site = (site_registry.list_registered_sites().get("sites") or {}).get(site_id) or {}
+    working = site.get("working_copy") or {}
+    if working.get("offline_only") is True or working.get("state") == "OFFLINE_CAMERA_DRAFT":
+        raise PermissionError("offline_camera_requires_digest_guarded_edit")
 
     runtime_env = (
         validate_camera_settings(
@@ -550,6 +557,10 @@ def _detection_active():
 def test_camera_candidate(
     site_id,
 ):
+
+    # Keep a different site's Camera/RTSP test from stopping live Detection.
+    from manager.services.calibration_worker_client import ensure_hardware_site_safe
+    ensure_hardware_site_safe(site_id)
 
     path = _candidate_file(
         site_id

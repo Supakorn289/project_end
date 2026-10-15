@@ -1315,6 +1315,13 @@ def verify_site_candidate(
     geometry_is_legacy_trial = bool(geometry_source == "candidate" and lab_legacy_accepted
                                     and not solver_geometry_accepted)
 
+    geometry_is_historical_session = bool(
+        isinstance(geometry_candidate, dict)
+        and geometry_source == 'candidate'
+        and geometry_candidate.get('historical_source_lab_only') is True
+        and geometry_candidate.get('field_accuracy_proven') is False
+    )
+
     geometry_is_forced = bool(
         geometry_source
         ==
@@ -1336,7 +1343,7 @@ def verify_site_candidate(
 
         status=(
             "WARN"
-            if (geometry_is_forced or geometry_is_legacy_trial)
+            if (geometry_is_forced or geometry_is_legacy_trial or geometry_is_historical_session)
             else None
         ),
 
@@ -1354,6 +1361,12 @@ def verify_site_candidate(
             if geometry_is_legacy_trial
             else
             (
+                'LAB-ONLY: Historical Session Draft solved and passed holdout; '
+                'current field accuracy unverified, not Production certified'
+            )
+            if geometry_is_historical_session
+            else
+            (
                 (
                     "Geometry พร้อม | "
                     f"{geometry_source}"
@@ -1368,6 +1381,12 @@ def verify_site_candidate(
             geometry_source,
     )
 
+
+    if geometry_is_historical_session and mode != 'LAB':
+        add('historical_session_production_block', 'Historical evidence is not production calibration',
+            required=True, ok=False,
+            detail='Session images differ from current PTZ captures: field and geometry validation required',
+            source='historical-session')
 
     # Geometry/Intrinsics dependency integrity.
     dependency_ok = False
@@ -1585,39 +1604,34 @@ def verify_site_candidate(
     # ========================================================
 
     telegram_candidate = (
-        _candidate_json(
-            site_id,
-            "telegram.json",
-        )
+        _candidate_json(site_id, "telegram.json")
     )
+    telegram_state = state.get("telegram", {}) or {}
+    if not isinstance(telegram_state, dict):
+        telegram_state = {}
 
-
-    telegram_state = (
-        state.get(
-            "telegram",
-            {}
-        )
-        or {}
-    )
-
+    # Read the current Candidate, not the Active runtime Telegram config.
+    # Old wizard booleans alone are insufficient: a later Token/Chat ID
+    # change must revoke the previous delivery-test evidence.
+    telegram_candidate_file = _candidate_path(site_id, "telegram.json")
+    telegram_digest = None
+    if (isinstance(telegram_candidate, dict) and telegram_candidate
+            and telegram_candidate_file.is_file()
+            and not telegram_candidate_file.is_symlink()
+            and not telegram_candidate_file.parent.is_symlink()):
+        telegram_digest = _sha256(telegram_candidate_file)
 
     telegram_configured = bool(
-        telegram_candidate
-        and
-        telegram_state.get(
-            "configured"
-        )
+        telegram_digest
+        and telegram_state.get("proof_version") == 1
+        and telegram_state.get("configured") is True
+        and telegram_state.get("candidate_sha256") == telegram_digest
     )
-
-
     telegram_tested = bool(
         telegram_configured
-        and
-        telegram_state.get(
-            "tested"
-        )
+        and telegram_state.get("tested") is True
+        and telegram_state.get("tested_candidate_sha256") == telegram_digest
     )
-
 
     telegram_required = (
         mode
@@ -1637,7 +1651,7 @@ def verify_site_candidate(
             telegram_configured,
 
         detail=(
-            "Telegram Candidate พร้อม"
+            "Telegram Candidate พร้อมและยืนยันข้อมูลแล้ว"
             if telegram_configured
             else
             "ยังไม่ได้ตั้ง Telegram Token / Chat ID"
@@ -1659,10 +1673,10 @@ def verify_site_candidate(
             telegram_tested,
 
         detail=(
-            "Telegram Test PASS"
+            "ทดสอบ Telegram ผ่านกับ Candidate ปัจจุบัน"
             if telegram_tested
             else
-            "ยังไม่ได้ส่ง Telegram Test สำเร็จ"
+            "ยังไม่มีผลทดสอบที่ยืนยันกับ Candidate ปัจจุบัน"
         ),
 
         source=
@@ -1784,12 +1798,19 @@ def verify_site_candidate(
         "candidate_ready":
             candidate_ready,
 
-        # Activation Engine จะเปิดใน Batch 3N.
+        # The privileged activation agent already exists.  Its socket's
+        # presence proves a local endpoint, not permission to activate this
+        # Candidate (publishing an immutable revision is still required).
         "activation_available":
-            False,
+            Path(
+                "/run/smart-fire-manager-agent/control.sock"
+            ).is_socket(),
 
         "ready_for_activation":
-            False,
+            False,  # Candidate is not an immutable, verified Revision
+
+        "activation_next_step":
+            "Publish immutable revision, then review the activation plan in Site Management",
 
         "activation_status": (
             "CANDIDATE_READY"

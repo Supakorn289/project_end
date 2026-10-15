@@ -362,3 +362,72 @@ def build_final_solver_inputs(
         "runtime_changed":
             False,
     }
+
+
+# Stage 3F: explicit, LAB-only source-session dataset. Never silently
+# incorporate legacy coordinates into current camera frames.
+def historical_draft_solver_inputs(site_id, *, evidence_provider=None):
+    import hashlib, json
+    from manager.services.phase45_editor import (_LEGACY_SITE, _LEGACY_REV, legacy_draft_preview)
+    from manager.services.runtime_site_crud import _require_editable_working_copy
+    if site_id != _LEGACY_SITE:
+        raise PermissionError('HISTORICAL_SOLVER_SITE_NOT_SUPPORTED')
+    working = _require_editable_working_copy(site_id)
+    if working.get('parent_revision') != _LEGACY_REV or working.get('recovery'):
+        raise PermissionError('HISTORICAL_SOLVER_WRONG_WORKING_COPY')
+    get_pair = evidence_provider or legacy_draft_preview
+    phases = {}
+    fingerprints = {}
+    readiness = {'minimum_points_per_pair': MIN_POINTS_PER_PAIR, 'train':{},'holdout':{}}
+    for phase in ('train', 'holdout'):
+        pairs = {}
+        for pair in PAIR_LIST:
+            view = get_pair(phase,pair)
+            if (view.get('site_id')!=site_id or view.get('revision_id')!=_LEGACY_REV
+                or view.get('phase')!=phase or view.get('pair')!=pair
+                or view.get('source_equals_active_images') is True
+                or view.get('draft',{}).get('editable') is not True):
+                raise RuntimeError('HISTORICAL_SOLVER_PROVENANCE_OR_EDITABLE_REJECTED:'+phase+':'+pair)
+            points = view['draft']['effective_marks']
+            if not isinstance(points,list) or not MIN_POINTS_PER_PAIR<=len(points)<=400:
+                raise ValueError('HISTORICAL_SOLVER_POINTS_INSUFFICIENT:'+phase+':'+pair)
+            # Every position is from one audited source-session frame. Validate each
+            # side against its own dimensions rather than the current PTZ image.
+            dims = view['source_dimensions']
+            a,b = dims['a'],dims['b']
+            clean = []
+            for mark in points:
+                for side,wh in (('a',a),('b',b)):
+                    x,y=mark['x_'+side+'_px'],mark['y_'+side+'_px']
+                    if (type(x) not in (float,int) or type(y) not in (float,int)
+                        or not math.isfinite(x) or not math.isfinite(y)
+                        or not (0<=x<wh[0] and 0<=y<wh[1])):
+                        raise ValueError('HISTORICAL_SOLVER_BAD_COORDINATE:'+phase+':'+pair)
+                clean.append(convert_mark(mark))
+            pairs[pair]=clean
+            readiness[phase][pair]={'count':len(clean),'ready':True}
+            fingerprints[phase+':'+pair]={
+                'source_marks_sha256':view['source_marks_sha256'],
+                'mixed_sha256':view['mixed_sha256'],
+                'session':view['source_session'],
+                'draft_digest':view['draft']['digest'],
+                'count':len(clean),
+                'image_dimensions':{side:list(dims[side]) for side in ('a','b')},
+            }
+        phases[phase]={'format':'smart-fire-manager-cross-preset-marks-v1','phase':phase,'pairs':pairs}
+    # Holdout must be from a different evidence session than Train per pair.
+    for pair in PAIR_LIST:
+        if fingerprints['train:'+pair]['session']==fingerprints['holdout:'+pair]['session']:
+            raise ValueError('HISTORICAL_HOLDOUT_NOT_INDEPENDENT:'+pair)
+    readiness.update(train_ready=True,holdout_ready=True,solver_ready=True)
+    outputs={
+        'positive_train':_select_pairs(phases['train'],POSITIVE_PAIRS),
+        'negative_train':_select_pairs(phases['train'],NEGATIVE_PAIRS),
+        'positive_holdout':_select_pairs(phases['holdout'],POSITIVE_PAIRS),
+        'negative_holdout':_select_pairs(phases['holdout'],NEGATIVE_PAIRS),
+    }
+    blob=json.dumps({'fingerprints':fingerprints,'inputs':outputs},sort_keys=True,separators=(',',':')).encode()
+    return {**outputs, 'readiness':readiness,'dataset_digest':hashlib.sha256(blob).hexdigest(),
+            'fingerprints':fingerprints,'site_id':site_id,'parent_revision':_LEGACY_REV,
+            'source':'historical_draft_lab_only','runtime_changed':False,'production_certified':False,
+            'field_accuracy_proven':False}

@@ -252,6 +252,12 @@ def wizard_calibration_start(
     site_id,
 ):
 
+    from manager.services.calibration_worker_client import ensure_hardware_site_safe
+    try:
+        ensure_hardware_site_safe(site_id)
+    except PermissionError as exc:
+        return jsonify({"ok": False, "error": str(exc), "runtime_changed": False}), 409
+
     try:
 
         lease = create_lease(
@@ -555,6 +561,12 @@ def wizard_capture(
     site_id,
 ):
 
+    from manager.services.calibration_worker_client import ensure_hardware_site_safe
+    try:
+        ensure_hardware_site_safe(site_id)
+    except PermissionError as exc:
+        return jsonify({"ok": False, "error": str(exc), "runtime_changed": False}), 409
+
     data = payload()
 
     capture_set = data.get(
@@ -609,205 +621,159 @@ def wizard_capture(
     )
 
 
-@wizard_bp.post(
-    "/api/wizard/<site_id>/distance/fit"
-)
+# Stage 3A: use the original Wizard endpoints; guard backend writes, not just UI.
+def _wizard_require_editable_distance(site_id):
+    from manager.services.site_registry import list_registered_sites
+    from manager.services.site_store import get_active_site
+    from manager.services.runtime_site_crud import _require_editable_working_copy
+    from manager.services.wizard_store import safe_site_id
+    site_id=safe_site_id(site_id)
+    records=(list_registered_sites().get("sites") or {})
+    record=records.get(site_id)
+    if not record:
+        raise PermissionError("site_not_registered")
+    active=get_active_site() or {}
+    if active.get("site_id")==site_id:
+        working=_require_editable_working_copy(site_id)
+        if working.get("parent_revision")!=active.get("revision_id"):
+            raise PermissionError("active_draft_parent_mismatch")
+        if working.get("recovery"):
+            raise PermissionError("recovery_draft_requires_special_workflow")
+    elif record.get("revisions") or (record.get("working_copy") or {}).get("parent_revision"):
+        raise PermissionError("inactive_existing_site_is_read_only")
+    return record
+
+
+@wizard_bp.post("/api/wizard/<site_id>/distance/fit")
 @require_manager_session
-def wizard_distance_fit(
-    site_id,
-):
-
-    data = payload()
-
-    points = data.get(
-        "points",
-        [],
-    )
-
-
+def wizard_distance_fit(site_id):
+    from manager.services.hardware_lock import hardware_lock
+    from manager.services.phase45_editor import invalidate_geometry_state
+    from datetime import datetime, timezone
+    data=payload()
+    points=data.get("points")
+    if not isinstance(points,list):
+        return jsonify({"ok":False,"error":"invalid_points","runtime_changed":False}),400
     try:
-
-        # ====================================================
-        # EXISTING PROJECT ENGINE
-        # calibration.fit_distance_model()
-        # ====================================================
-
-        candidate = (
-            build_distance_candidate(
-                points,
-
-                preset=data.get(
-                    "preset"
-                ),
-
-                site_id=
-                    site_id,
-            )
-        )
-
-
-        candidate_file = (
-            save_candidate(
-                site_id,
-                "distance_global.json",
-                candidate,
-            )
-        )
-
-
-        state = load_state(
-            site_id
-        )
-
-
-        state[
-            "distance"
-        ][
-            "points"
-        ] = points
-
-
-        state[
-            "distance"
-        ][
-            "candidate"
-        ] = candidate
-
-
-        state[
-            "step"
-        ] = "DISTANCE_VERIFY"
-
-
-        save_state(
-            site_id,
-            state,
-        )
-
-
-        return ok(
-            engine=(
-                "calibration."
-                "fit_distance_model"
-            ),
-
-            candidate=
-                candidate,
-
-            candidate_file=str(
-                candidate_file
-            ),
-
-            runtime_changed=
-                False,
-        )
-
-
+        with hardware_lock("wizard-distance-state:"+site_id,timeout=3.0):
+            _wizard_require_editable_distance(site_id)
+            state=load_state(site_id)
+            if data.get("expected_updated_at") is not None and data["expected_updated_at"]!=state.get("updated_at"):
+                raise RuntimeError("WIZARD_STATE_CHANGED_RELOAD_REQUIRED")
+            candidate=build_distance_candidate(points,preset=data.get("preset"),site_id=site_id)
+            # The original calibrated artifact and history remain in immutable revisions.
+            # Saved field verification from the OLD fit must not validate a NEW model.
+            distance=state.setdefault("distance",{})
+            previous=distance.get("verifications") or []
+            if not isinstance(previous,list):
+                raise RuntimeError("verification_history_corrupt")
+            if previous:
+                distance.setdefault("superseded_verifications",[]).append({
+                    "time":datetime.now(timezone.utc).isoformat(),
+                    "reason":"distance_model_refit",
+                    "old_model":distance.get("candidate"),
+                    "events":previous,
+                })
+            distance["verifications"]=[]
+            distance["points"]=points
+            distance["candidate"]=candidate
+            state["step"]="DISTANCE_VERIFY"
+            invalidate_geometry_state(state)
+            # Existing candidate file path and fit engine are unchanged.
+            candidate_file=save_candidate(site_id,"distance_global.json",candidate)
+            save_state(site_id,state)
+            return ok(engine="calibration.fit_distance_model",candidate=candidate,
+                      wizard_updated_at=state.get("updated_at"),
+                      candidate_file=str(candidate_file),
+                      previous_verifications_superseded=len(previous),
+                      geometry_reverification_required=True,
+                      runtime_changed=False)
     except Exception as exc:
-
-        return jsonify({
-            "ok": False,
-
-            "error": (
-                f"{type(exc).__name__}: "
-                f"{exc}"
-            ),
-        }), 400
+        return jsonify({"ok":False,"error":f"{type(exc).__name__}: {exc}","runtime_changed":False}),409
 
 
-@wizard_bp.post(
-    "/api/wizard/<site_id>/distance/verify"
-)
+# Stage 3C.1: manage only current-model field verification entries. Historical
+# audit events and prior immutable revisions must remain unchanged.
+@wizard_bp.post("/api/wizard/<site_id>/distance/verify")
 @require_manager_session
-def wizard_distance_verify(
-    site_id,
-):
-
-    data = payload()
-
-
+def wizard_distance_verify(site_id):
+    import hashlib
+    from datetime import datetime, timezone
+    from manager.services.hardware_lock import hardware_lock
+    from manager.services.wizard_store import CANDIDATE_DIR
+    data=payload()
     try:
-
-        state = load_state(
-            site_id
-        )
-
-
-        candidate = (
-            state[
-                "distance"
-            ][
-                "candidate"
-            ]
-        )
-
-
-        if not candidate:
-
-            raise ValueError(
-                "ยังไม่มี distance candidate"
-            )
-
-
-        # ====================================================
-        # EXISTING PROJECT ENGINE
-        # calibration.DistanceModel.estimate()
-        # ====================================================
-
-        verification = (
-            verify_distance_candidate(
-                candidate,
-
-                y_px=data[
-                    "y_px"
-                ],
-
-                actual_distance_m=data[
-                    "actual_distance_m"
-                ],
-            )
-        )
-
-
-        state[
-            "distance"
-        ][
-            "verifications"
-        ].append(
-            verification
-        )
-
-
-        save_state(
-            site_id,
-            state,
-        )
-
-
-        return ok(
-            engine=(
-                "calibration."
-                "DistanceModel.estimate"
-            ),
-
-            verification=
-                verification,
-
-            runtime_changed=
-                False,
-        )
-
-
+        with hardware_lock("wizard-distance-state:"+site_id,timeout=3.0):
+            _wizard_require_editable_distance(site_id)
+            state=load_state(site_id)
+            action=data.get("action","verify")
+            if action not in {"verify","withdraw","restore","clear"}:
+                raise ValueError("unsupported_verification_action")
+            # No destructive changes may be accepted from a stale tab or a
+            # request omitting its original Wizard State revision token.
+            if action != "verify" and not isinstance(data.get("expected_updated_at"),str):
+                raise RuntimeError("WIZARD_STATE_PRECONDITION_REQUIRED")
+            if data.get("expected_updated_at") is not None and data["expected_updated_at"]!=state.get("updated_at"):
+                raise RuntimeError("WIZARD_STATE_CHANGED_RELOAD_REQUIRED")
+            distance=state.get("distance") or {}
+            candidate=distance.get("candidate")
+            if not isinstance(candidate,dict):
+                raise ValueError("no_current_distance_fit:refit_first")
+            artifact=CANDIDATE_DIR/site_id/"distance_global.json"
+            if artifact.is_symlink() or not artifact.is_file():
+                raise RuntimeError("distance_candidate_missing_or_unsafe")
+            # Preserve Stage 3A: verification only applies to the exact
+            # candidate that is currently saved as the distance model.
+            if json.loads(artifact.read_text(encoding="utf-8"))!=candidate:
+                raise RuntimeError("distance_model_changed_refresh_required")
+            model_sha=hashlib.sha256(json.dumps(candidate,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+            active=distance.get("verifications",[])
+            if not isinstance(active,list):raise RuntimeError("verification_history_corrupt")
+            withdrawn=distance.setdefault("withdrawn_verifications",[])
+            if not isinstance(withdrawn,list):raise RuntimeError("withdrawal_history_corrupt")
+            if action=="verify":
+                v=verify_distance_candidate(candidate,y_px=data["y_px"],actual_distance_m=data["actual_distance_m"])
+                active.append(v)
+                distance["verifications"]=active
+                state["distance"]=distance
+                save_state(site_id,state)
+                return ok(engine="calibration.DistanceModel.estimate",verification=v,
+                          wizard_updated_at=state.get("updated_at"),runtime_changed=False)
+            timestamp=datetime.now(timezone.utc).isoformat()
+            if action=="withdraw":
+                index=data.get("index")
+                if type(index) is not int or not 0<=index<len(active):raise ValueError("invalid_verification_index")
+                if data.get("expected_verification")!=active[index]:
+                    raise RuntimeError("VERIFICATION_RECORD_CHANGED_RELOAD_REQUIRED")
+                event=active.pop(index)
+                withdrawn.append({"event":event,"model_sha256":model_sha,"withdrawn_at":timestamp,
+                                  "reason":"operator_withdrawn","restored_at":None})
+            elif action=="restore":
+                index=data.get("index")
+                if type(index) is not int or not 0<=index<len(withdrawn):raise ValueError("invalid_withdrawal_index")
+                event=withdrawn[index]
+                if not isinstance(event,dict) or event.get("restored_at") is not None:
+                    raise RuntimeError("already_restored_or_invalid_withdrawal")
+                if event.get("model_sha256")!=model_sha:
+                    raise RuntimeError("DISTANCE_MODEL_CHANGED_CANNOT_RESTORE_VERIFICATION")
+                if not isinstance(event.get("event"),dict):raise RuntimeError("withdrawal_event_corrupt")
+                active.append(event["event"])
+                event["restored_at"]=timestamp
+            else:
+                if data.get("confirm_value")!="CLEAR VERIFICATIONS":
+                    raise ValueError("typed_confirmation_required")
+                for event in active:
+                    withdrawn.append({"event":event,"model_sha256":model_sha,
+                                      "withdrawn_at":timestamp,"reason":"operator_clear_all", "restored_at":None})
+                active.clear()
+            distance["verifications"]=active
+            state["distance"]=distance
+            save_state(site_id,state)
+            return ok(action=action,verifications=active,withdrawn_verifications=withdrawn,
+                      wizard_updated_at=state["updated_at"],runtime_changed=False,
+                      distance_model_changed=False,geometry_changed=False)
     except Exception as exc:
-
-        return jsonify({
-            "ok": False,
-
-            "error": (
-                f"{type(exc).__name__}: "
-                f"{exc}"
-            ),
-        }), 400
+        return jsonify({"ok":False,"error":f"{type(exc).__name__}: {exc}","runtime_changed":False}),409
 
 
 @wizard_bp.post(
@@ -1081,67 +1047,31 @@ def wizard_runtime_schema():
     "/api/wizard/<site_id>/site-location"
 )
 @require_manager_session
-def wizard_site_location(
-    site_id,
-):
+def wizard_site_location(site_id):
+    """Save registry location only; never rewrite solved geometry Wizard State.
 
+    Client must submit the registry updated_at it displayed. Stale writes fail
+    inside the registry's exclusive lock. This route never touches candidate,
+    active deployment, or the detection process.
+    """
     data = payload()
-
-
     try:
-
+        _wizard_require_editable_distance(site_id)
+        if not isinstance(data, dict) or not isinstance(data.get("expected_updated_at"), str) or not data["expected_updated_at"]:
+            raise ValueError("SITE_LOCATION_PRECONDITION_REQUIRED")
         site = set_site_location(
             site_id,
-
-            installation_location=
-                data.get(
-                    "installation_location"
-                ),
-
-            latitude=
-                data.get(
-                    "latitude"
-                ),
-
-            longitude=
-                data.get(
-                    "longitude"
-                ),
+            installation_location=data.get("installation_location"),
+            latitude=data.get("latitude"),
+            longitude=data.get("longitude"),
+            expected_updated_at=data["expected_updated_at"],
         )
-
-
-        state = load_state(
-            site_id
-        )
-
-
-        state[
-            "site_location"
-        ] = site.get(
-            "location"
-        )
-
-
-        save_state(
-            site_id,
-            state,
-        )
-
-
-        return ok(
-            site=site,
-            state=state,
-            runtime_changed=False,
-        )
-
-
+        return ok(site=site, runtime_changed=False,
+                  wizard_state_changed=False,
+                  gps_candidate_changed=False)
     except Exception as exc:
-
-        return jsonify({
-            "ok": False,
-            "error":
-                f"{type(exc).__name__}: {exc}",
-        }), 400
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}",
+                        "runtime_changed": False}), 409 if "CHANGED_RELOAD" in str(exc) else 400
 
 
 @wizard_bp.get(

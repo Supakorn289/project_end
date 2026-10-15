@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import math
 import json
 import os
 import re
@@ -565,6 +566,9 @@ def _site_location(
         longitude
     )
 
+    if not (math.isfinite(latitude) and math.isfinite(longitude)):
+        raise ValueError("พิกัดต้องเป็นตัวเลขที่มีค่าจริง")
+
 
     if not (
         -90.0
@@ -910,6 +914,7 @@ def set_site_location(
     installation_location=None,
     latitude=None,
     longitude=None,
+    expected_updated_at=None,
 ) -> dict:
 
     site_id = _validate_site_id(
@@ -946,6 +951,10 @@ def set_site_location(
             site_id
         ]
 
+        # Compare inside the registry lock, not before it. An older browser
+        # must never overwrite edits made by another operator.
+        if expected_updated_at is not None and site.get("updated_at") != expected_updated_at:
+            raise RuntimeError("SITE_LOCATION_CHANGED_RELOAD_REQUIRED")
 
         if (
             site.get(
@@ -971,6 +980,10 @@ def set_site_location(
                 "Latitude / Longitude"
             )
 
+
+        # Do not churn timestamps on an unchanged edit.
+        if site.get("location") == location:
+            return site
 
         site[
             "location"

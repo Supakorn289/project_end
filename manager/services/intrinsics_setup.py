@@ -9,8 +9,10 @@ from pathlib import Path
 
 
 from manager.services.wizard_store import (
+    CANDIDATE_DIR,
     candidate_path,
     load_state,
+    safe_site_id,
     save_candidate,
     save_state,
 )
@@ -234,12 +236,11 @@ def intrinsics_status(
     site_id,
 ):
 
+    # STAGE3H1: a read-only status request must not create a Candidate.
+    site = safe_site_id(site_id)
     captures = sorted(
-        capture_dir(
-            site_id
-        ).glob(
-            "calib_*.jpg"
-        )
+        (CANDIDATE_DIR / site / "intrinsics_workspace" / "captures")
+        .glob("calib_*.jpg")
     )
 
 
@@ -292,11 +293,8 @@ def intrinsics_status(
         }
 
 
-    candidate_path_value = (
-        candidate_file(
-            site_id
-        )
-    )
+    # candidate_file() uses candidate_path(), which mkdir()s even for reads.
+    candidate_path_value = CANDIDATE_DIR / site / "camera_intrinsics.json"
 
 
     candidate = {

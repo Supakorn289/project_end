@@ -12,6 +12,18 @@ from config import (
 )
 from geometry import bearing_to_compass
 
+_COMPASS_TH = {
+    "N": "ทิศเหนือ", "NE": "ทิศตะวันออกเฉียงเหนือ",
+    "E": "ทิศตะวันออก", "SE": "ทิศตะวันออกเฉียงใต้",
+    "S": "ทิศใต้", "SW": "ทิศตะวันตกเฉียงใต้",
+    "W": "ทิศตะวันตก", "NW": "ทิศตะวันตกเฉียงเหนือ",
+}
+
+def _compass_th(code: str) -> str:
+    return _COMPASS_TH[code]
+
+
+
 
 # ============================================================
 # Location safety
@@ -144,7 +156,7 @@ def format_alert(
         (
             f"ทิศทาง: "
             f"{d.bearing_deg:.1f}° "
-            f"({bearing_to_compass(d.bearing_deg)})"
+            f"({_compass_th(bearing_to_compass(d.bearing_deg))})"
         ),
     ]
 

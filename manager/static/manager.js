@@ -13,19 +13,18 @@ const titles = {
 function clsForStatus(status) {
     const value = String(status || "").toUpperCase();
 
+    // Evaluate negative/uncertain states first: INACTIVE contains ACTIVE,
+    // and NOT_READY contains READY. A false green state is unsafe.
     if (
-        value.includes("READY")
-        || value.includes("ACTIVE")
-        || value.includes("VALIDATED")
-        || value === "PASS"
-    ) {
-        return "good";
-    }
-
-    if (
-        value.includes("REQUIRED")
+        value === "INACTIVE"
+        || value.includes("NOT_READY")
+        || value.includes("NOT_INSTALLED")
+        || value.includes("REQUIRED")
         || value.includes("FAIL")
         || value.includes("ERROR")
+        || value.includes("BLOCKED")
+        || value.includes("MISSING")
+        || value.includes("INVALID")
     ) {
         return "bad";
     }
@@ -38,6 +37,15 @@ function clsForStatus(status) {
         || value.includes("DISABLED")
     ) {
         return "warn";
+    }
+
+    if (
+        value.includes("READY")
+        || value.includes("ACTIVE")
+        || value.includes("VALIDATED")
+        || value === "PASS"
+    ) {
+        return "good";
     }
 
     return "info";
