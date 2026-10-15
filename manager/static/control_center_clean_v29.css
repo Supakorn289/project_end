@@ -133,3 +133,33 @@ body {font-size:14px;line-height:1.55;}
 .sf29-error {color:#ffacba;border-left:3px solid #ee7890;padding-left:12px;}
 #sf29-root {max-width:100%;}
 #sf29-overview-detail summary:focus-visible, #sf29-advanced summary:focus-visible {outline:3px solid #60a5fa;outline-offset:2px;}
+
+/* v3.0 Stage 3E: single safe delete entry point in the existing Site Manager. */
+.sf29-action-hint {font-size:12px;color:var(--sf29-muted);margin:-7px 0 0;line-height:1.6;overflow-wrap:anywhere;}
+#sf29-advanced [data-delete-rev], #sf29-advanced [data-delete-site] {display:none!important;}
+#sf29-root button.sf29-danger:disabled {opacity:.42;}
+
+/* Stage 3E.1: one compact Trash restore control inside existing Site Manager */
+.sf29-trash {border:1px solid #31465c;border-radius:11px;padding:0 14px;}
+.sf29-trash > summary {cursor:pointer;padding:14px 2px;font-size:13px;font-weight:600;color:#c6d6e9;}
+.sf29-trash[open] > summary {border-bottom:1px solid #293b52;}
+.sf29-trash-note {margin:12px 0;color:var(--sf29-muted);font-size:12px;}
+.sf29-trash-controls {display:grid;gap:12px;padding:0 0 15px;min-width:0;}
+#sf29-trash-select {max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+.sf29-trash .sf29-actions {margin-top:0;}
+
+/* Stage 3C.2C: scoped offline camera controls inside the existing Site card. */
+.sf29-offline {margin-top:14px;padding:14px;border:1px solid var(--sf29-border, #3d5068);border-radius:10px;}
+.sf29-offline h3 {font-size:15px;font-weight:600;margin:0 0 8px;}
+.sf29-offline p {font-size:12px;line-height:1.55;overflow-wrap:anywhere;}
+.sf29-offline .sf29-inline {display:flex;gap:10px;margin:9px 0;flex-wrap:wrap;}
+.sf29-offline .sf29-inline label {display:flex;flex-direction:column;flex:1 1 180px;min-width:0;gap:5px;font-size:12px;}
+.sf29-offline input {width:100%;box-sizing:border-box;min-width:0;min-height:40px;padding:8px 10px;border:1px solid #3d5068;border-radius:8px;background:#182433;color:#f4f7fb;}
+@media (max-width:520px) {.sf29-offline {padding:10px;}.sf29-offline .sf29-inline {flex-direction:column;}}
+
+/* Stage 3C.2D: extend the existing offline draft, no separate page */
+.sf29-review{margin-top:1rem;padding:.9rem;border:1px solid var(--sf-border,#d2d9e3);border-radius:10px}
+.sf29-review summary{cursor:pointer;font-weight:650}
+.sf29-review label{display:block;margin:.65rem 0;font-size:.9rem}
+.sf29-review select,.sf29-review textarea{display:block;width:100%;max-width:100%;margin:.25rem 0;padding:.55rem;border-radius:7px;border:1px solid #aeb8c4;background:var(--sf-field-bg,#fff);color:var(--sf-text,#172435)}
+.sf29-review p{margin:.55rem 0}

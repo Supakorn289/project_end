@@ -251,6 +251,12 @@ def _allowed_maintenance(site, rev, record, working):
     new = load_state(site)
     def rest(a):
         return {k:v for k,v in a.items() if k not in IGNORE_DRAFT_STATE | {'camera_connection'}}
+    from manager.services.runtime_site_crud import verified_published_history
+    if old.get('latest_revision') != new.get('latest_revision'):
+        if not verified_published_history(site, working, new.get('latest_revision')):
+            raise RuntimeError('unverified_wizard_revision_history')
+        old = {k:v for k,v in old.items() if k != 'latest_revision'}
+        new = {k:v for k,v in new.items() if k != 'latest_revision'}
     if rest(old)!=rest(new) or new.get('draft_parent_revision') != rev:
         raise RuntimeError('wizard_modified_outside_camera_connection')
     state_camera = new.get('camera_connection') or {}

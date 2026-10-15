@@ -204,6 +204,11 @@ def _active_settings_trial_preview(site_id):
         old_wizard = _read(parent / 'wizard_state.json')
         new_wizard = load_state(site_id)
         ignored = {'draft_parent_revision', 'draft_started_at', 'calibration_mode', 'updated_at'}
+        from manager.services.runtime_site_crud import verified_published_history
+        if old_wizard.get('latest_revision') != new_wizard.get('latest_revision'):
+            if not verified_published_history(site_id, working, new_wizard.get('latest_revision')):
+                return None
+            ignored.add('latest_revision')
         if ({k:v for k,v in old_wizard.items() if k not in ignored} !=
             {k:v for k,v in new_wizard.items() if k not in ignored}):
             return None

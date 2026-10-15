@@ -186,6 +186,8 @@ canvas{
  grid-template-columns:1fr 1fr;
  gap:12px
 }
+#v30GeometryMarkList .point{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#v30GeometryMarkList .point span{flex:1 1 270px;overflow-wrap:anywhere}
 small{color:var(--muted)}
 @media(max-width:800px){
  .shell{grid-template-columns:1fr}
@@ -284,7 +286,7 @@ small{color:var(--muted)}
         class="hidden"
     >
         <label>
-            Site ที่มีอยู่
+            พื้นที่ติดตั้งที่มีอยู่ (Site)
             <select id="existingSite"></select>
         </label>
 
@@ -294,7 +296,7 @@ small{color:var(--muted)}
         >
 
             <label>
-                สถานที่ติดตั้ง
+                ชื่อหรือรายละเอียดสถานที่ติดตั้ง
                 <input
                     id="existingSiteLocation"
                     placeholder="เช่น อาคาร A ชั้น 3"
@@ -302,7 +304,7 @@ small{color:var(--muted)}
             </label>
 
             <label>
-                Latitude
+                ละติจูด (Latitude)
                 <input
                     id="existingSiteLat"
                     type="number"
@@ -313,7 +315,7 @@ small{color:var(--muted)}
             </label>
 
             <label>
-                Longitude
+                ลองจิจูด (Longitude)
                 <input
                     id="existingSiteLon"
                     type="number"
@@ -331,7 +333,7 @@ small{color:var(--muted)}
         >
 
             <button id="btnUseExisting">
-                เปิด / ดำเนินการต่อ
+                โหลดค่าที่บันทึกไว้ / เปิดไซต์
             </button>
 
             <button
@@ -340,6 +342,10 @@ small{color:var(--muted)}
             >
                 บันทึกข้อมูลสถานที่
             </button>
+            <button id="btnClearExistingLocation" class="secondary" type="button">
+                ล้างชื่อและพิกัดสถานที่ (เฉพาะ LAB)
+            </button>
+
 
         </div>
     </div>
@@ -517,6 +523,7 @@ small{color:var(--muted)}
             <button
                 id="btnSaveCameraSetup"
                 class="green"
+                disabled
             >
                 บันทึก Camera Candidate
             </button>
@@ -524,12 +531,29 @@ small{color:var(--muted)}
             <button
                 id="btnTestCameraSetup"
                 class="secondary"
+                disabled
             >
                 ทดสอบ Camera / RTSP
             </button>
 
         </div>
 
+
+
+        <!-- Camera v3.0: replace the separate v2.5a editor with in-Wizard controls. -->
+        <div id="v30CameraMaintenance" class="hidden" style="margin-top:12px">
+            <div class="row">
+                <button id="v30CameraDraft" class="secondary" type="button" disabled>สร้าง Working Copy จาก Active Revision</button>
+            </div>
+            <div id="v30CameraAttestation" class="hidden" style="margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:12px">
+                <strong>LAB: ยืนยันว่าเป็นกล้องเดิม</strong>
+                <p class="sub">ใช้ได้เฉพาะการแก้ IP/Port/RTSP/บัญชีกล้องตัวเดิม หลัง Camera Test ผ่าน ไม่ใช่การรับรอง Production</p>
+                <label><input id="v30SameCamera" type="checkbox" style="width:auto"> กล้องและเลนส์ยังเป็นตัวเดิม</label>
+                <label><input id="v30SameMount" type="checkbox" style="width:auto"> จุดติดตั้ง มุมยึดและ Preset Mapping ไม่เปลี่ยน</label>
+                <label><input id="v30LabOnly" type="checkbox" style="width:auto"> ยอมรับว่า Geometry เดิมยังเป็น LAB Trial</label>
+                <button id="v30CameraAttest" class="secondary" type="button" disabled>ยืนยัน Same-Camera LAB Maintenance</button>
+            </div>
+        </div>
 
         <div
             id="cameraSetupStatus"
@@ -787,6 +811,11 @@ small{color:var(--muted)}
         </label>
     </div>
 
+    <div class="status" id="v30DistanceSource" role="status"
+         style="margin:12px 0;line-height:1.7;font-size:14px;white-space:pre-wrap">
+        กำลังตรวจข้อมูล Distance ที่บันทึกไว้…
+    </div>
+
     <div
         class="canvas-wrap"
         style="margin-top:14px"
@@ -805,6 +834,10 @@ small{color:var(--muted)}
             เพิ่ม Calibration Point
         </button>
 
+        <button type="button" id="btnReplaceDistance" class="secondary">
+            เริ่มวัดใหม่ / แทนที่ทั้งชุด
+        </button>
+
         <button
             id="btnFitDistance"
             class="green"
@@ -813,10 +846,12 @@ small{color:var(--muted)}
         </button>
     </div>
 
+    
     <div
         id="distancePoints"
         class="points"
     ></div>
+    <div class="sub" id="v30DistanceEditStatus" style="margin:8px 0">การลบ/แก้รายการจะบันทึกเมื่อกด Fit Distance Model เท่านั้น</div>
 
     <div
         id="distanceStatus"
@@ -872,6 +907,12 @@ small{color:var(--muted)}
     >
         —
     </div>
+    <div class="sub" id="v30VerificationHistory" style="margin-top:9px">กำลังโหลดผลตรวจระยะที่บันทึกไว้…</div>
+    <div class="row" style="margin-top:10px">
+        <button type="button" class="secondary" id="v30RefreshVerifications">โหลดผลตรวจที่บันทึกไว้</button>
+        <button type="button" class="secondary" id="v30ClearVerifications">ถอนผลตรวจทั้งหมดจากรายการปัจจุบัน</button>
+    </div>
+    <div class="sub" id="v30VerificationHistoryStatus" role="status">รายการที่ถอนจะเก็บเป็นประวัติและสามารถคืนได้ถ้าโมเดลระยะยังไม่เปลี่ยน</div>
 </section>
 
 
@@ -925,8 +966,23 @@ small{color:var(--muted)}
             >
                 ล้าง Pair นี้
             </button>
+            <button id="v30RestoreOriginalPair" class="secondary" type="button" hidden>คืนจุดต้นฉบับทั้ง Pair (Draft)</button>
         </div>
 
+    </div>
+
+    <div class="row" style="margin-top:12px;align-items:end;gap:12px">
+        <label style="min-width:300px">
+            แหล่งภาพและจุด Landmark
+            <select id="v30LegacyImageMode">
+                <option value="current">ภาพปัจจุบัน / Working Copy</option>
+                <option value="source">หลักฐาน Session ต้นฉบับ (อ่านอย่างเดียว)</option>
+                <option value="draft">แก้ไขชุดจุดบนภาพ Session ต้นฉบับ (Draft)</option>
+            </select>
+        </label>
+        <div class="sub" id="v30LegacyProvenance" role="status" style="flex:1">
+            ใช้ภาพ Wizard ปัจจุบัน; จุดเก่าจากคนละ Session จะไม่ถูกวาดทับภาพนี้
+        </div>
     </div>
 
     <div
@@ -944,6 +1000,8 @@ small{color:var(--muted)}
         </div>
     </div>
 
+    <div class="sub" id="v30GeometryHistory" role="status" style="margin:12px 0">กำลังตรวจรายการ Landmark เดิม…</div>
+    <div id="v30GeometryMarkList" class="points" aria-label="จุด Landmark ที่เคยบันทึก"></div>
     <div
         id="geometryStatus"
         class="status"
@@ -967,14 +1025,14 @@ small{color:var(--muted)}
             id="btnPrepareGeometry"
             class="green"
         >
-            เตรียมข้อมูลสำหรับ Solver
+            ตรวจและเตรียมจุด (Solver)
         </button>
 
         <button
             id="btnSolveGeometry"
             class="green"
         >
-            คำนวณ Geometry ด้วย Solver เดิม
+            คำนวณตำแหน่งระหว่างภาพ (Solver)
         </button>
 
         <button
@@ -1058,9 +1116,10 @@ small{color:var(--muted)}
     </h2>
 
     <p class="sub">
-        กรอกพิกัดจริงของตำแหน่งที่ติดตั้งกล้อง
-        ขั้นนี้ยังไม่เปิด GPS Output
-        จนกว่าจะ Activate Site
+        บันทึกพิกัดของกล้องสำหรับเวอร์ชันที่กำลังแก้ (GPS Candidate)
+        หากต้องการให้คำเตือน GPS ในการตรวจความพร้อมหายไป
+        ให้บันทึกชื่อและพิกัดเดียวกันในขั้นตอนที่ 1 ด้วย
+        การบันทึกทั้งสองส่วนยังไม่เปลี่ยนตำแหน่งที่ Detection ใช้งาน
     </p>
 
 
@@ -1109,7 +1168,7 @@ small{color:var(--muted)}
             id="btnBuildLocation"
             class="green"
         >
-            บันทึก GPS Candidate
+            บันทึกพิกัดกล้อง (ร่าง)
         </button>
 
     </div>
@@ -1403,6 +1462,7 @@ async()=>{
             .getElementById("authStatus")
             .textContent =
             "Unlocked";
+        if(siteId) loadCameraSetupStatus().catch(console.error);
 
     }catch(error){
         document
@@ -1435,28 +1495,21 @@ function showAfterSite(){
 
     if(siteId){
 
-        loadIntrinsicsStatus()
-        .catch(
-            console.error
-        );
-
-
-        loadCameraSetupStatus()
-        .catch(
-            console.error
-        );
-
-
-        loadTelegramStatus()
-        .catch(
-            console.error
-        );
-
-
-        loadFinalVerification()
-        .catch(
-            console.error
-        );
+        // Errors must be visible in the existing status controls, not console-only.
+        for(const [fn,id] of [
+          [loadIntrinsicsStatus,'intrinsicsStatus'],
+          [loadCameraSetupStatus,'cameraSetupStatus'],
+          [loadTelegramStatus,'telegramStatus'],
+          [loadFinalVerification,'finalVerificationStatus']
+        ]){
+          const openedSite=siteId;
+          Promise.resolve().then(fn).catch(error=>{
+            if(siteId!==openedSite)return;
+            const target=document.getElementById(id);
+            if(target)target.textContent='โหลดข้อมูลไม่สำเร็จ: '+String(error);
+            console.error(error);
+          });
+        }
     }
 }
 
@@ -1585,8 +1638,21 @@ async function loadSites(){
     fillExistingLocationForm();
 
 
-    select.onchange =
-        fillExistingLocationForm;
+    select.onchange = ()=>{
+        fillExistingLocationForm();
+        if(siteId && siteId!==select.value){
+            ++v30SiteLoadTicket;
+            document.getElementById('btnUseExisting').disabled=false;
+            // Prevent values/capture images from previous site remaining visible.
+            siteId=null;wizardState=null;distancePoints=[];v30GeometrySnapshot=null;
+            document.querySelectorAll('#devicePanel,#intrinsicsPanel,#capturePanel,#distancePanel,#verifyPanel,#geometryPanel,#finalPanel')
+              .forEach(el=>el.classList.add('hidden'));
+            document.getElementById('siteStatus').textContent=
+               'เลือกไซต์ใหม่แล้ว · กด “โหลดค่าที่บันทึกไว้ / เปิดไซต์” เพื่ออ่านข้อมูลของไซต์นี้';
+            const selector=document.getElementById('activationRevision');
+            if(selector)selector.innerHTML='<option value="">เลือกไซต์เพื่อโหลด Revision</option>';
+        }
+    };
 }
 
 
@@ -1605,119 +1671,89 @@ if(entryMode === "new"){
 }
 
 
-document
-    .getElementById(
-        "btnSaveExistingLocation"
-    )
-    .onclick =
-async()=>{
+// The two editors have distinct purposes: registry location affects Final
+// Verification; camera GPS candidate affects the future deployment payload.
+// They must never silently overwrite each other or the solved geometry state.
+function v30LocationPayload(clear=false){
+ const location=clear?'':document.getElementById('existingSiteLocation').value.trim();
+ const lat=clear?'':document.getElementById('existingSiteLat').value.trim();
+ const lon=clear?'':document.getElementById('existingSiteLon').value.trim();
+ if((lat==='') !== (lon===''))throw Error('ต้องกรอกพิกัดทั้งสองช่อง หรือปล่อยว่างทั้งสองช่อง');
+ if(lat!==''){
+  const a=Number(lat),b=Number(lon);
+  if(!Number.isFinite(a)||!Number.isFinite(b)||a < -90||a > 90||b < -180||b > 180)
+   throw Error('พิกัดไม่ถูกต้อง: Latitude -90 ถึง 90 และ Longitude -180 ถึง 180');
+ }
+ return {installation_location:location,latitude:lat,longitude:lon};
+}
+async function v30SaveRegistryLocation(clear=false){
+ const selected=document.getElementById('existingSite').value;
+ const status=document.getElementById('siteStatus');
+ const save=document.getElementById('btnSaveExistingLocation');
+ const erase=document.getElementById('btnClearExistingLocation');
+ if(!selected || !siteRegistry[selected]){status.textContent='เลือกพื้นที่ติดตั้งก่อน';return;}
+ let form;
+ try{form=v30LocationPayload(clear);}catch(e){status.textContent=String(e);return;}
+ if(clear){
+  if(siteRegistry[selected]?.mode!=='LAB'){
+   status.textContent='การล้างค่าทั้งหมดอนุญาตเฉพาะพื้นที่ทดลอง (LAB)';return;
+  }
+  const confirmation=window.prompt('พิมพ์รหัสพื้นที่เพื่อยืนยันการล้างชื่อและพิกัดในทะเบียน (ไม่ลบ GPS Candidate หรือ Active Runtime): '+selected);
+  if(confirmation!==selected){status.textContent='ยกเลิกการล้างข้อมูล';return;}
+ }
+ save.disabled=true;erase.disabled=true;
+ try{
+  const record=siteRegistry[selected];
+  if(!record.updated_at)throw Error('ไม่พบข้อมูลรุ่นทะเบียนพื้นที่ กรุณาโหลดหน้าใหม่');
+  const data=await api(`/api/wizard/${encodeURIComponent(selected)}/site-location`,{
+   method:'POST',body:JSON.stringify({...form,expected_updated_at:record.updated_at})
+  });
+  if(document.getElementById('existingSite').value!==selected)return;
+  siteRegistry[selected]=data.site;
+  fillExistingLocationForm();
+  status.textContent=clear?
+   'ล้างชื่อและพิกัดจากทะเบียนพื้นที่ทดลองแล้ว · GPS Candidate และ Active Runtime ไม่เปลี่ยน':
+   'บันทึกลงทะเบียนพื้นที่สำเร็จ · Final Verification อ่านค่าชุดนี้ · GPS Candidate ในขั้นตอนที่ 8 ยังเป็นอีกชุด';
+  if(siteId===selected){
+   await loadFinalVerification().catch(e=>{status.textContent+='\nตรวจความพร้อมซ้ำไม่สำเร็จ: '+String(e);});
+  }
+ }catch(e){status.textContent='บันทึกไม่สำเร็จ: '+String(e)+' · โหลดค่าที่บันทึกไว้อีกครั้งก่อนแก้ซ้ำ';}
+ finally{save.disabled=false;erase.disabled=false;}
+}
+document.getElementById('btnSaveExistingLocation').onclick=()=>v30SaveRegistryLocation(false);
+document.getElementById('btnClearExistingLocation').onclick=()=>v30SaveRegistryLocation(true);
 
-    const selected =
-        document
-        .getElementById(
-            "existingSite"
-        )
-        .value;
-
-
-    if(!selected){
-        return;
-    }
-
-
-    try{
-
-        const data =
-            await api(
-                `/api/wizard/${selected}/site-location`,
-                {
-                    method:"POST",
-
-                    body:
-                        JSON.stringify({
-
-                            installation_location:
-                                document
-                                .getElementById(
-                                    "existingSiteLocation"
-                                )
-                                .value
-                                .trim(),
-
-                            latitude:
-                                document
-                                .getElementById(
-                                    "existingSiteLat"
-                                )
-                                .value,
-
-                            longitude:
-                                document
-                                .getElementById(
-                                    "existingSiteLon"
-                                )
-                                .value,
-                        }),
-                }
-            );
-
-
-        siteRegistry[
-            selected
-        ] =
-            data.site;
-
-
-        document
-            .getElementById(
-                "siteStatus"
-            )
-            .textContent =
-            "บันทึกข้อมูลสถานที่เรียบร้อย";
-
-
-    }catch(error){
-
-        document
-            .getElementById(
-                "siteStatus"
-            )
-            .textContent =
-            String(error);
-    }
-};
-
-
-document
-    .getElementById("btnUseExisting")
-    .onclick =
-async()=>{
-    siteId =
-        document
-        .getElementById("existingSite")
-        .value;
-
-    const data =
-        await api(
-            `/api/wizard/state/${siteId}`
-        );
-
-    wizardState =
-        data.state;
-
-    document
-        .getElementById("siteStatus")
-        .textContent =
-        `Using ${siteId} · ${wizardState.mode}`;
-
-    history.replaceState(
-        null,
-        "",
-        `/setup-wizard?mode=existing&site=${encodeURIComponent(siteId)}`
-    );
-
-    showAfterSite();
-    restoreCaptures();
+// One existing control now refreshes all stored-value sources for the chosen site.
+// Reading is safe: never fit, save, publish or activate during hydration.
+let v30SiteLoadTicket=0;
+document.getElementById('btnUseExisting').onclick=async()=>{
+ const selected=document.getElementById('existingSite').value;
+ const box=document.getElementById('siteStatus');
+ const ticket=++v30SiteLoadTicket;
+ if(!selected){box.textContent='เลือก Site ก่อน';return;}
+ const btn=document.getElementById('btnUseExisting');
+ btn.disabled=true;box.textContent='กำลังโหลด Wizard State ของ '+selected+' (อ่านอย่างเดียว)...';
+ try{
+  const data=await api(`/api/wizard/state/${encodeURIComponent(selected)}`);
+  if(ticket!==v30SiteLoadTicket || document.getElementById('existingSite').value!==selected)return;
+  if(!data.state || data.state.site_id && data.state.site_id!==selected)
+    throw Error('WIZARD_STATE_SITE_ID_MISMATCH');
+  siteId=selected;wizardState=data.state;
+  history.replaceState(null,'',`/setup-wizard?mode=existing&site=${encodeURIComponent(selected)}`);
+  showAfterSite();
+  restoreCaptures();
+  // Revision panel is initially mounted before siteId exists; old code never refetched.
+  document.getElementById('btnRefreshRevisions')?.click();
+  const dp=Array.isArray(wizardState?.distance?.points)?wizardState.distance.points.length:0;
+  const dv=Array.isArray(wizardState?.distance?.verifications)?wizardState.distance.verifications.length:0;
+  box.textContent=`ไซต์ ${selected} · ${wizardState.mode||'—'} · โหลดข้อมูลแล้ว\n`+
+    `Wizard: Distance samples ${dp} รายการ · Verification ${dv} รายการ\n`+
+    'ข้อมูลอื่นโหลดจาก Candidate / Active Revision / Historical Session ตามที่ระบุในแต่ละขั้นตอน';
+  box.style.whiteSpace='pre-line';
+ }catch(e){
+  if(ticket!==v30SiteLoadTicket)return;
+  box.textContent='โหลดค่าของไซต์ไม่สำเร็จ: '+String(e);
+ }finally{if(ticket===v30SiteLoadTicket)btn.disabled=false;}
 };
 
 
@@ -1876,6 +1912,8 @@ async()=>{
         );
 
         showAfterSite();
+        restoreCaptures();
+        document.getElementById('btnRefreshRevisions')?.click();
 
     }catch(error){
         document
@@ -2207,8 +2245,13 @@ function restoreCaptures(){
         }
     }
 
+    v30RestoreHistory();
     loadDistanceImage();
     loadGeometryPair();
+    v30LoadGeometrySnapshot().catch(error=>{
+        document.getElementById("v30GeometryHistory").textContent =
+            "ไม่สามารถโหลด Editor Snapshot: " + String(error);
+    });
 }
 
 
@@ -2220,10 +2263,12 @@ function drawImageOnCanvas(
 
     if(!url)return;
 
-    const image =
-        new Image();
+    const image = new Image();
+    const renderTicket = (Number(canvas.dataset.renderTicket)||0)+1;
+    canvas.dataset.renderTicket=String(renderTicket);
 
     image.onload = ()=>{
+        if (Number(canvas.dataset.renderTicket)!==renderTicket) return;
 
         canvas.width =
             image.naturalWidth;
@@ -2253,6 +2298,13 @@ function drawImageOnCanvas(
             ctx.lineWidth = 3;
             ctx.strokeStyle = "#ff3b3b";
             ctx.stroke();
+        }
+
+        // Coordinates come from stored Wizard State, never inferred from model matrices.
+        if (canvas.id === "distanceCanvas") {
+            v30DistanceOverlay(ctx,canvas);
+        } else if (canvas.id === "geometryA" || canvas.id === "geometryB") {
+            v30GeometryOverlay(ctx,canvas.id === "geometryA" ? "a" : "b");
         }
     };
 
@@ -2347,13 +2399,521 @@ event=>{
 
 let distancePoints = [];
 
+// v3.0 Stage 2C: restore and edit within EXISTING Wizard, not another editor.
+let v30DistanceDirty=false;
+let v30DistanceReplaceMode=false; // Local only; the persisted model is not removed until a validated Fit succeeds.
+let v30GeometrySnapshot=null;
+let v30SelectedMark=-1;
+let v30EditingIndex=-1;
+
+function v30Finite(value){return typeof value==="number" && Number.isFinite(value);}
+function v30ValidDistancePoint(p){
+ return p && v30Finite(Number(p.distance_m)) && Number(p.distance_m)>0 &&
+        v30Finite(Number(p.y_px)) && Number(p.y_px)>=0 && Number(p.y_px)<720;
+}
+function v30HasFittedModelWithoutRawSamples(){
+ const raw=wizardState?.distance?.points;
+ const hasRaw=Array.isArray(raw) && raw.length>0;
+ const hasFit=Boolean(wizardState?.distance?.candidate) ||
+   (v30GeometrySnapshot?.site_id===siteId && Boolean(v30GeometrySnapshot?.overview?.distance));
+ return Boolean(hasFit && !hasRaw);
+}
+function v30DistanceDirtyLabel(){
+ document.getElementById("v30DistanceEditStatus").textContent=v30DistanceReplaceMode
+  ? `โหมดแทนที่ทั้งชุด (เฉพาะ Draft): วัดจริงแล้ว ${distancePoints.length}/5 จุดขั้นต่ำ · โมเดลเก่ายังอยู่จนกว่า Fit ใหม่จะสำเร็จ · กดยกเลิกการแก้ที่ยังไม่ Fit เพื่อคืนข้อมูล`
+  : v30DistanceDirty
+    ? "มีรายการ Distance ที่ยังไม่บันทึก · ตรวจตัวอย่างทั้งหมดก่อนกด Fit ใหม่ · Verification/Geometry เดิมต้องตรวจใหม่"
+    : "รายการนี้เป็น Raw Samples จาก Wizard State เท่านั้น · ค่า Y≈ จากโมเดลเก่าใช้เป็นแค่แนวทาง ไม่ใช่จุดวัดจริง";
+}
+function v30RestoreHistory(){
+ const d=wizardState?.distance||{};
+ distancePoints=Array.isArray(d.points) ? d.points.filter(v30ValidDistancePoint).map(p=>({
+  distance_m:Number(p.distance_m),y_px:Number(p.y_px)
+ })) : [];
+ distanceClick=null;v30DistanceDirty=false;v30DistanceReplaceMode=false;v30SelectedMark=-1;v30EditingIndex=-1;v30GeometrySnapshot=null;
+ renderDistancePoints();v30DistanceDirtyLabel();v30RenderDistanceOverview();v30RenderVerifications();v30RestoreAuxiliaryValues();
+}
+function v30Fmt(n,d=2){return n!==null && n!==undefined && n!=="" && v30Finite(Number(n))?Number(n).toFixed(d):"—";}
+// v3.0 Stage 2F: Restore only persisted values from authoritative sources.
+// NEVER infer measurement evidence from a fitted model or source camera frames.
+function v30ValidCoordinate(v,lo,hi){
+ if(v===null || v===undefined || v==="")return false;
+ const n=Number(v);return Number.isFinite(n) && n>=lo && n<=hi;
+}
+function v30ValidBearing(v){return v!==null && v!==undefined && v!=="" && Number.isFinite(Number(v)) && Number(v)>=0 && Number(v)<=360;}
+function v30RestoreAuxiliaryValues(){
+ if(!siteId || !wizardState)return;
+ // Wizard location/build writes gps.candidate; site-location separately stores registry location.
+ const gps=wizardState?.gps?.candidate||{};
+ const registry=siteRegistry?.[siteId]?.location||{};
+ const saved=wizardState?.site_location||{};
+ const sources=[
+  ['GPS Candidate',gps.camera_lat,gps.camera_lon],
+  ['Site Registry',registry.latitude ?? registry.camera_lat, registry.longitude ?? registry.camera_lon],
+  ['Wizard Site Location',saved.latitude ?? saved.camera_lat,saved.longitude ?? saved.camera_lon]
+ ];
+ const choice=sources.find(([_,lat,lon])=>v30ValidCoordinate(lat,-90,90) && v30ValidCoordinate(lon,-180,180));
+ const latEl=document.getElementById('cameraLat'),lonEl=document.getElementById('cameraLon');
+ if(choice){
+  latEl.value=String(choice[1]);lonEl.value=String(choice[2]);
+  document.getElementById('locationStatus').textContent=
+   `พบพิกัดที่บันทึกไว้จาก ${choice[0]} · การแสดงค่าไม่ใช่การ Activate GPS Output`;
+ }else{
+  // Never preserve stale values when changing sites.
+  latEl.value='';lonEl.value='';
+  document.getElementById('locationStatus').textContent=
+   'ไม่พบพิกัด GPS ที่ยืนยันได้ใน Candidate หรือ Site Registry — ไม่สร้างพิกัดแทน';
+ }
+ const draft=wizardState?.north?.candidate||{};
+ const active=(v30GeometrySnapshot?.site_id===siteId ? v30GeometrySnapshot?.overview?.site : null)||{};
+ const northInput=document.getElementById('northBearing');
+ if(v30ValidBearing(draft.measured_preset1_bearing_deg)){
+  northInput.value=String(draft.measured_preset1_bearing_deg);
+  document.getElementById('northStatus').textContent=
+   `True North จาก Wizard Candidate · Bearing P1=${Number(draft.measured_preset1_bearing_deg).toFixed(2)}°`;
+ }else if(v30ValidBearing(active.measured_preset1_bearing_deg)){
+  northInput.value=String(active.measured_preset1_bearing_deg);
+  document.getElementById('northStatus').textContent=
+   `True North อ้างอิงจาก Active Revision (ไม่ใช่ค่า Draft ที่บันทึกใหม่) · Bearing P1=${Number(active.measured_preset1_bearing_deg).toFixed(2)}°`+
+   (v30ValidBearing(active.north_offset_deg)?` · North offset=${Number(active.north_offset_deg).toFixed(2)}°`:'');
+ }else{
+  northInput.value='';
+  document.getElementById('northStatus').textContent=v30ValidBearing(active.north_offset_deg)
+   ?`Active Revision มี North offset=${Number(active.north_offset_deg).toFixed(2)}° แต่ไม่มี Bearing P1 ต้นฉบับ — ไม่คำนวณย้อนเป็นค่าที่เคยวัด`
+   :'ไม่พบค่า True North จาก Wizard Candidate / Active Revision';
+ }
+}
+function v30RenderDistanceOverview(){
+ const candidate=wizardState?.distance?.candidate;
+ const snap=v30GeometrySnapshot?.site_id===siteId?v30GeometrySnapshot?.overview?.distance:null;
+ const c=candidate||snap||{};
+ const source=candidate?'Wizard Candidate':snap?'Active Revision (อ้างอิง, ยังไม่ได้แก้ Draft)':'ไม่พบโมเดลที่ตรวจได้';
+ const el=document.getElementById('v30DistanceSource');
+ let summary=`Distance ${source}: จุดในรายการที่กำลังแก้ ${distancePoints.length} จุด${v30DistanceDirty?' (ยังไม่ Fit)':''} | `+
+  `H=${v30Fmt(c.H,3)}, K=${v30Fmt(c.K,3)}, RMSE=${v30Fmt(c.pixel_rmse,3)} px | `+
+  `ช่วง=${v30Fmt(c.min_distance_m)}–${v30Fmt(c.max_distance_m)} m | จำนวนจุดที่ใช้ Fit=${c.points??'—'}`;
+ if(!distancePoints.length && Number(c.points)>0){
+  summary+=' | ไม่มีระยะ/Y Pixel รายจุดใน Wizard State หรือ Model ที่อ่านได้';
+ }
+ if(v30DistanceReplaceMode){
+  summary+='\nโหมดวัดใหม่: ต้องวัดระยะจริงและคลิก Y จากภาพทีละจุด (อย่างน้อย 5 จุด) · ตัวเลขคาดการณ์จากโมเดลเดิมจะไม่ถูกนำมาใช้ Fit อัตโนมัติ';
+  el.textContent=summary;
+  return;
+ }
+ const H=c.H,K=c.K,min=c.min_distance_m,max=c.max_distance_m;
+ if(!distancePoints.length && [H,K,min,max].every(v=>v!==null && v!==undefined && v!=='' && Number.isFinite(Number(v)))
+  && Number(min)>0 && Number(max)>=Number(min) && Math.abs(Number(K))>1e-9){
+  const examples=[Number(min),(Number(min)+Number(max))/2,Number(max)]
+   .map(z=>`${z.toFixed(2)} m → Y≈${(Number(H)+Number(K)/z).toFixed(1)} px`);
+  summary+='\nการคาดการณ์จากสมการ y=H+K/d (ไม่ใช่จุดที่เคยมาร์คจริง): '+examples.join(' | ');
+ }
+ el.textContent=summary;
+}
+function v30VerificationBox(msg){
+ document.getElementById('v30VerificationHistoryStatus').textContent=msg;
+}
+async function v30VerificationAction(action,index,expectedVerification,confirmValue){
+ const box=document.getElementById('v30VerificationHistoryStatus');
+ if(!siteId||!wizardState){v30VerificationBox('เลือกพื้นที่และโหลดข้อมูลก่อน');return;}
+ if(v30DistanceDirty){v30VerificationBox('ยังมีรายการจุดระยะที่แก้แต่ไม่ได้ Fit · ต้อง Fit หรือยกเลิกก่อน');return;}
+ try{
+  const policy=await v30CameraInventoryGuard();
+  if(policy.mode==='blocked'||(policy.mode==='active'&&!(await v30RequireEditableSnapshot()).editable))
+   throw Error('พื้นที่นี้ไม่มี Working Copy ที่แก้ไขได้');
+  const body={action,index,expected_updated_at:wizardState.updated_at};
+  if(expectedVerification)body.expected_verification=expectedVerification;
+  if(confirmValue)body.confirm_value=confirmValue;
+  const result=await api(`/api/wizard/${encodeURIComponent(siteId)}/distance/verify`,{
+    method:'POST',body:JSON.stringify(body)
+  });
+  wizardState.distance=wizardState.distance||{};
+  wizardState.distance.verifications=result.verifications;
+  wizardState.distance.withdrawn_verifications=result.withdrawn_verifications;
+  wizardState.updated_at=result.wizard_updated_at;
+  v30RenderVerifications();
+  v30VerificationBox(action==='restore'?'คืนรายการที่ถอนแล้ว · ตรวจ Final Verification ใหม่':
+     'ถอนผลตรวจออกจากการประเมินปัจจุบันแล้ว · เก็บประวัติไว้ ไม่แก้โมเดลหรือ Runtime');
+ }catch(e){box.textContent='ดำเนินการไม่สำเร็จ: '+String(e)+' · โหลดข้อมูลใหม่ก่อนลองอีกครั้ง';}
+}
+function v30RenderVerifications(){
+ const root=document.getElementById('v30VerificationHistory');
+ root.replaceChildren();
+ const active=wizardState?.distance?.verifications||[];
+ const withdrawn=wizardState?.distance?.withdrawn_verifications||[];
+ if(!Array.isArray(active)||!Array.isArray(withdrawn)){
+  root.textContent='ประวัติ Verification ไม่สมบูรณ์ · ไม่อนุญาตให้แก้';return;
+ }
+ const heading=document.createElement('p');
+ heading.textContent=`ผลตรวจที่ยังใช้อยู่ ${active.length} รายการ · ถอนออก ${withdrawn.filter(x=>x?.restored_at==null).length} รายการ`;
+ root.append(heading);
+ if(!active.length){
+  const p=document.createElement('p');p.textContent='ไม่มีผลตรวจระยะที่ยังมีผล · ต้องวัดและตรวจระยะภาคสนามใหม่';root.append(p);
+ }
+ active.forEach((v,i)=>{
+  const line=document.createElement('div');line.className='row';
+  line.style.cssText='border:1px solid #263244;border-radius:8px;padding:9px;margin:6px 0';
+  const details=document.createElement('span');details.style.flex='1';
+  details.textContent=`#${i+1} ระยะจริง ${v30Fmt(v.actual_distance_m)} m · Y ${v30Fmt(v.y_px,1)} px · คาดการณ์ ${v30Fmt(v.predicted_distance_m)} m · Error ${v30Fmt(v.percent_error)}% · ${v.grade||'—'}`;
+  const button=document.createElement('button');button.type='button';button.className='secondary';
+  button.textContent='ถอนผลตรวจ';
+  button.onclick=()=>{if(confirm(`ถอนผลตรวจ #${i+1} จากการประเมินปัจจุบัน?\nข้อมูลเดิมจะเก็บเป็นประวัติ ไม่ลบถาวร`))
+    v30VerificationAction('withdraw',i,v);};
+  line.append(details,button);root.append(line);
+ });
+ withdrawn.forEach((entry,i)=>{
+  if(entry?.restored_at!=null)return;
+  const item=entry?.event||{};
+  const line=document.createElement('div');line.className='row';line.style.cssText='margin:6px 0;padding:6px;border-left:2px solid #62758b';
+  const text=document.createElement('span');text.style.flex='1';
+  text.textContent=`ถอนแล้ว: ${v30Fmt(item.actual_distance_m)} m · Y ${v30Fmt(item.y_px,1)} px`;
+  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='คืนผลตรวจ';
+  button.onclick=()=>v30VerificationAction('restore',i);
+  line.append(text,button);root.append(line);
+ });
+}
+document.getElementById('v30RefreshVerifications').onclick=async()=>{
+ try{const result=await api(`/api/wizard/state/${encodeURIComponent(siteId)}`);
+  if(result.state.site_id!==siteId)throw Error('site_mismatch');
+  wizardState=result.state;v30RenderVerifications();v30VerificationBox('โหลดผลตรวจที่บันทึกไว้แล้ว');
+ }catch(e){v30VerificationBox('โหลดผลตรวจไม่สำเร็จ: '+String(e));}
+};
+document.getElementById('v30ClearVerifications').onclick=async()=>{
+ const current=wizardState?.distance?.verifications||[];
+ if(!current.length){v30VerificationBox('ไม่มีผลตรวจที่ต้องถอน');return;}
+ const typed=prompt('ถอนผลตรวจปัจจุบันทั้งหมด '+current.length+' รายการ?\nจะเก็บเป็นประวัติและ Final Verification อาจกลับเป็น WARN\nพิมพ์ CLEAR VERIFICATIONS เพื่อยืนยัน');
+ if(typed!=='CLEAR VERIFICATIONS')return;
+ await v30VerificationAction('clear',null,null,typed);
+};
+function v30DistanceOverlay(ctx,canvas){
+ ctx.save();ctx.font="bold 18px sans-serif";ctx.lineWidth=2;
+ distancePoints.forEach((p,i)=>{
+  const y=Number(p.y_px);if(!Number.isFinite(y)||y<0||y>=canvas.height)return;
+  ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);
+  ctx.strokeStyle="rgba(255,221,93,0.9)";ctx.stroke();
+  ctx.fillStyle="#ffe87a";ctx.fillText(`#${i+1} ${v30Fmt(p.distance_m)} m · Y=${v30Fmt(y,1)}`,14,Math.max(22,y-7));
+ });ctx.restore();
+}
+let v30LegacyEvidence=null;
+let v30LegacyEditingKey=null;
+let v30LegacyTicket=0;
+const v30LegacyButtons=['btnSaveMark','btnClearMarks','btnGeometryReadiness',
+    'btnPrepareGeometry','btnSolveGeometry','btnForceGeometry'];
+let v30LegacyPreviousDisabled=null;
+function v30LegacyMode(){return document.getElementById('v30LegacyImageMode').value!=='current';}
+function v30LegacyIsDraft(){return document.getElementById('v30LegacyImageMode').value==='draft';}
+function v30LegacyButtonLock(on){
+ if(on){
+  if(!v30LegacyPreviousDisabled)v30LegacyPreviousDisabled=Object.fromEntries(
+   v30LegacyButtons.map(id=>[id,document.getElementById(id).disabled]));
+  v30LegacyButtons.forEach(id=>document.getElementById(id).disabled=
+    !(v30LegacyIsDraft() && v30LegacyEvidence?.draft?.editable && (id==='btnSaveMark'||id==='btnClearMarks'||id==='btnGeometryReadiness'||id==='btnPrepareGeometry'||id==='btnSolveGeometry')));
+ }else if(v30LegacyPreviousDisabled){
+  for(const id of v30LegacyButtons) document.getElementById(id).disabled=v30LegacyPreviousDisabled[id];
+  v30LegacyPreviousDisabled=null;
+ }
+}
+async function v30LoadLegacyPair(){
+ const ticket=++v30LegacyTicket;
+ const phase=document.getElementById('geometryPhase').value;
+ const pair=document.getElementById('geometryPair').value;
+ v30LegacyEvidence=null;v30SelectedMark=-1;v30EditingIndex=-1;v30LegacyEditingKey=null;
+ v30LegacyButtonLock(true);
+ document.getElementById('v30LegacyProvenance').textContent='ตรวจ SHA และแหล่งภาพ Session ต้นฉบับ…';
+ clearGeometryCanvas(document.getElementById('geometryA'),'กำลังโหลดต้นฉบับ A');
+ clearGeometryCanvas(document.getElementById('geometryB'),'กำลังโหลดต้นฉบับ B');
+ try{
+  const data=await api(`/api/phase45/active/legacy-evidence/${phase}/${pair}`);
+  if(ticket!==v30LegacyTicket || !v30LegacyMode() ||
+     phase!==document.getElementById('geometryPhase').value ||
+     pair!==document.getElementById('geometryPair').value)return;
+  if(data.ok!==true || data.read_only!==true || data.phase!==phase || data.pair!==pair ||
+     !Array.isArray(data.marks) || !data.draft || !Array.isArray(data.draft.effective_marks))throw Error('ผลตรวจหลักฐาน/ชุดแก้ไขไม่สมบูรณ์');
+  v30LegacyEvidence=data;
+  v30LegacyPaint();
+ }catch(err){
+  if(ticket!==v30LegacyTicket || !v30LegacyMode())return;
+  document.getElementById('v30LegacyProvenance').textContent=
+    'ไม่สามารถยืนยันหลักฐานต้นฉบับได้ — หยุดการแสดงจุด: '+String(err);
+  document.getElementById('v30GeometryHistory').textContent='หลักฐานไม่ผ่าน Integrity Guard';
+  document.getElementById('v30GeometryMarkList').replaceChildren();
+  // Never leave stale loading placeholders or previously drawn markers behind.
+  clearGeometryCanvas(document.getElementById('geometryA'),'หลักฐาน A ไม่พร้อม');
+  clearGeometryCanvas(document.getElementById('geometryB'),'หลักฐาน B ไม่พร้อม');
+ }
+}
+function v30LegacyPaint(){
+ const data=v30LegacyEvidence;
+ if(!v30LegacyMode() || !data)return;
+ const phase=document.getElementById('geometryPhase').value;
+ const pair=document.getElementById('geometryPair').value;
+ if(data.phase!==phase || data.pair!==pair)return;
+ document.getElementById('pairLabelA').textContent='Session A · P'+pair.split('-')[0];
+ document.getElementById('pairLabelB').textContent='Session B · P'+pair.split('-')[1];
+ v30LegacyButtonLock(true);
+ const draft=v30LegacyIsDraft();
+ document.getElementById('v30RestoreOriginalPair').hidden=!draft;
+ document.getElementById('v30RestoreOriginalPair').disabled=!data.draft.editable;
+ document.getElementById('v30LegacyProvenance').textContent=
+   `${data.source_session} · ${phase.toUpperCase()} · SHA Verified · `+
+   (draft?`Draft: เก่า ${data.draft.kept_source_count} + เพิ่มใหม่ ${data.draft.added_count} − ลบเดิม ${data.draft.removed_count} | ไม่ใช่ข้อมูล Solver`: `${data.count} จุดต้นฉบับ · อ่านอย่างเดียว`);
+ document.getElementById('btnSaveMark').textContent=draft ? (v30LegacyEditingKey ? 'บันทึกการแก้จุดใน Draft':'เพิ่มจุดใหม่ใน Draft') : 'บันทึก Landmark';
+ document.getElementById('btnClearMarks').textContent=draft?'ล้างจุดทั้ง Pair (Draft)':'ล้าง Pair นี้';
+ document.getElementById('geometryStatus').textContent=draft
+   ? 'กำลังแก้ชุดจุดบนภาพ Session เดิมเท่านั้น · จุดที่ยังไม่ลบจะถูกรวมกับจุดใหม่ใน Draft · ยังไม่ใช้ Solve/Publish/Runtime'
+   : 'ต้นฉบับอ่านอย่างเดียว · เลือกจุดแล้วกดลบจาก Draft ได้ (ต้องยืนยัน) · ไม่แตะหลักฐานจริง';
+ drawImageOnCanvas(document.getElementById('geometryA'),data.frame_urls.a,geometryClickA);
+ drawImageOnCanvas(document.getElementById('geometryB'),data.frame_urls.b,geometryClickB);
+ v30RenderMarkList();
+}
+document.getElementById('v30RestoreOriginalPair').onclick=()=>v30LegacyRestoreAll().catch(v30LegacyError);
+document.getElementById('v30LegacyImageMode').onchange=()=>{
+ ++v30LegacyTicket;
+ v30LegacyEvidence=null;
+ geometryClickA=null;geometryClickB=null;v30SelectedMark=-1;v30EditingIndex=-1;v30LegacyEditingKey=null;
+ if(v30LegacyMode())v30LoadLegacyPair();
+ else{
+  v30LegacyButtonLock(false);
+  document.getElementById('v30RestoreOriginalPair').hidden=true;
+  document.getElementById('btnSaveMark').textContent='บันทึก Landmark';
+  document.getElementById('btnClearMarks').textContent='ล้าง Pair นี้';
+  document.getElementById('v30LegacyProvenance').textContent=
+     'ภาพปัจจุบัน / Working Copy; ไม่แสดงจุดจาก Session เก่าบนภาพนี้';
+  loadGeometryPair();
+ }
+};
+function v30CurrentMarks(){
+ if(v30LegacyMode())return v30LegacyIsDraft()
+  ? (Array.isArray(v30LegacyEvidence?.draft?.effective_marks)?v30LegacyEvidence.draft.effective_marks:[])
+  : (Array.isArray(v30LegacyEvidence?.marks)?v30LegacyEvidence.marks:[]);
+ const pair=document.getElementById("geometryPair").value;
+ const phase=document.getElementById("geometryPhase").value;
+ const marks=v30GeometrySnapshot?.site_id===siteId
+  ? v30GeometrySnapshot?.marks?.[phase]?.[pair]
+  : wizardState?.geometry?.[phase]?.[pair];
+ return Array.isArray(marks)?marks:[];
+}
+function v30GeometryOverlay(ctx,side){
+ const marks=v30CurrentMarks();ctx.save();ctx.textBaseline="middle";
+ marks.forEach((m,i)=>{
+  const x=Number(m[`x_${side}_px`]),y=Number(m[`y_${side}_px`]);
+  if(!Number.isFinite(x)||!Number.isFinite(y))return;
+  ctx.beginPath();ctx.arc(x,y,i===v30SelectedMark?12:9,0,2*Math.PI);
+  ctx.fillStyle=i===v30SelectedMark?"#ff9c45":"#18e7ce";ctx.fill();
+  ctx.lineWidth=2;ctx.strokeStyle="#09121f";ctx.stroke();
+  ctx.font="bold 13px sans-serif";ctx.fillStyle="#03141b";ctx.textAlign="center";
+  ctx.fillText(String(v30LegacyIsDraft() && m.origin==='source'?m.source_index+1:i+1),x,y+0.5);
+ });ctx.restore();
+}
+function v30RenderMarkList(){
+ const marks=v30CurrentMarks(),root=document.getElementById("v30GeometryMarkList");
+ if(v30LegacyMode()){
+  root.replaceChildren();
+  const ev=v30LegacyEvidence;
+  const isDraft=v30LegacyIsDraft();
+  const d=ev?.draft;
+  document.getElementById('v30GeometryHistory').textContent=ev
+   ? `ภาพ Session ${ev.source_session} · ${ev.phase.toUpperCase()} Pair ${ev.pair} · ต้นฉบับ ${ev.count} จุด · Draft เหลือ ${d.kept_source_count} จุดเดิม เพิ่ม ${d.added_count} จุด ลบ ${d.removed_count} จุด (ไม่เข้า Solver)`
+   : 'กำลังตรวจหลักฐาน Legacy';
+  if(!ev)return;
+  marks.forEach((m,i)=>{
+   const key=isDraft?m.key:`src:${i}`;
+   const sourceIndex=isDraft?(m.origin==='source'?m.source_index:null):i;
+   const removed=sourceIndex!==null && d.deleted_marks.some(v=>v.source_index===sourceIndex);
+   const line=document.createElement('div');line.className='point';
+   const label=document.createElement('span');
+   label.textContent=`${sourceIndex!==null?'#'+(sourceIndex+1):'เพิ่มใหม่ #'+(i+1)} A(${v30Fmt(m.x_a_px,1)}, ${v30Fmt(m.y_a_px,1)}) ↔ B(${v30Fmt(m.x_b_px,1)}, ${v30Fmt(m.y_b_px,1)})${removed?' · ถูกลบใน Draft':''}`;
+   const view=document.createElement('button');view.type='button';view.className='secondary';view.textContent='ดูจุด';
+   view.onclick=()=>{v30SelectedMark=i;v30LegacyPaint();};
+   line.append(label,view);
+   if(isDraft){
+    const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='แก้จุด';
+    edit.disabled=!d.editable;
+    edit.onclick=()=>{
+     v30LegacyEditingKey=key;v30SelectedMark=i;
+     geometryClickA={x:Number(m.x_a_px),y:Number(m.y_a_px)};
+     geometryClickB={x:Number(m.x_b_px),y:Number(m.y_b_px)};
+     v30LegacyPaint();
+     document.getElementById('geometryStatus').textContent=`กำลังแก้ ${key} · คลิกพิกัดใหม่บนภาพ A/B แล้วบันทึกใน Draft`;
+    };
+    line.append(edit);
+   }
+   if(!removed){
+    const del=document.createElement('button');del.type='button';del.className='red';del.textContent='ลบจาก Draft';
+    del.disabled=!d.editable;
+    del.onclick=()=>v30LegacyDelete(key).catch(v30LegacyError);
+    line.append(del);
+   }else{
+    const undo=document.createElement('button');undo.type='button';undo.className='secondary';undo.textContent='คืนจุดใน Draft';
+    undo.disabled=!d.editable;
+    undo.onclick=()=>v30LegacyMutate('restore',key).catch(v30LegacyError);
+    line.append(undo);
+   }
+   root.append(line);
+  });
+  if(isDraft && d.deleted_marks.length){
+   const header=document.createElement('p');header.textContent=`จุดเดิมที่ลบออกจาก Draft (${d.deleted_marks.length}) — สามารถคืนได้`;root.append(header);
+   d.deleted_marks.forEach(m=>{
+    const line=document.createElement('div');line.className='point';
+    const label=document.createElement('span');label.textContent=`#${m.source_index+1} (ลบแล้ว) A(${v30Fmt(m.x_a_px,1)},${v30Fmt(m.y_a_px,1)}) ↔ B(${v30Fmt(m.x_b_px,1)},${v30Fmt(m.y_b_px,1)})`;
+    const undo=document.createElement('button');undo.type='button';undo.className='secondary';undo.textContent='คืนจุด';
+    undo.disabled=!d.editable;
+    undo.onclick=()=>v30LegacyMutate('restore',m.key).catch(v30LegacyError);
+    line.append(label,undo);root.append(line);
+   });
+  }
+  return;
+ }
+ const pair=document.getElementById("geometryPair").value;
+ const phase=document.getElementById("geometryPhase").value;
+ const total=(wizardState?.geometry?.[phase]||{});
+ const counts=Object.entries(total).map(([p,v])=>`${p}:${Array.isArray(v)?v.length:0}`).join(" · ");
+ document.getElementById("v30GeometryHistory").textContent=
+  `${phase.toUpperCase()} Pair ${pair}: ${marks.length} จุด | จำนวนจุดในแต่ละ Pair: ${counts||"ไม่มีข้อมูล"}`+
+  (!marks.length?" | ถ้าเคย Mark ใน Legacy แต่ไม่ได้บันทึกพิกัดไว้ จะไม่สามารถวาดจุดเดิมจาก Geometry Matrix ได้":"");
+ root.replaceChildren();
+ marks.forEach((m,i)=>{
+  const line=document.createElement("div");line.className="point";
+  const label=document.createElement("span");
+  label.textContent=`#${i+1} A(${v30Fmt(m.x_a_px,1)}, ${v30Fmt(m.y_a_px,1)}) ↔ B(${v30Fmt(m.x_b_px,1)}, ${v30Fmt(m.y_b_px,1)})`;
+  const view=document.createElement("button");view.type="button";view.className="secondary";view.textContent="ดูจุด";
+  view.onclick=()=>{v30SelectedMark=i;loadGeometryPairForSelection();};
+  const del=document.createElement("button");del.type="button";del.className="red";del.textContent="ลบจุด";
+  del.disabled=!(v30GeometrySnapshot?.site_id===siteId && v30GeometrySnapshot.editable);
+  del.title=del.disabled?"การลบรายจุดใช้ได้เฉพาะ Active Working Copy ที่ตรวจผ่าน Guard":"ลบจาก Working Copy และยกเลิกผล Solve เดิม";
+  del.onclick=()=>v30DeleteSavedMark(i).catch(e=>{
+   document.getElementById("geometryStatus").textContent="ลบไม่สำเร็จ: "+String(e);
+  });
+  const edit=document.createElement("button");edit.type="button";edit.className="secondary";edit.textContent="แก้จุด";
+  edit.disabled=del.disabled;
+  edit.onclick=()=>{
+   v30EditingIndex=i;v30SelectedMark=i;
+   geometryClickA={x:Number(m.x_a_px),y:Number(m.y_a_px)};
+   geometryClickB={x:Number(m.x_b_px),y:Number(m.y_b_px)};
+   document.getElementById("btnSaveMark").textContent=`อัปเดต Landmark #${i+1}`;
+   document.getElementById("geometryStatus").textContent=
+    `กำลังแก้ Landmark #${i+1} · คลิกตำแหน่งใหม่ที่ภาพ A และ/หรือ B แล้วกดอัปเดต`;
+   loadGeometryPairForSelection();
+  };
+  line.append(label,view,edit,del);root.append(line);
+ });
+}
+function loadGeometryPairForSelection(){
+ if(v30LegacyMode()){v30LegacyPaint();return;}
+ const info=geometryPhaseInfo(),[a,b]=geometryPairParts();
+ const capA=info.captures[String(a)],capB=info.captures[String(b)];
+ if(capA)drawImageOnCanvas(document.getElementById("geometryA"),capA.relative_url,geometryClickA);
+ if(capB)drawImageOnCanvas(document.getElementById("geometryB"),capB.relative_url,geometryClickB);
+ v30RenderMarkList();
+}
+async function v30LoadGeometrySnapshot(){
+ if(!siteId) return;
+ const target=siteId;
+ let snapshot;
+ try{snapshot=await api("/api/phase45/active/editor");}
+ catch(e){snapshot=null;}
+ if(target!==siteId)return;
+ v30GeometrySnapshot=snapshot?.site_id===siteId?snapshot:null;
+ v30RenderDistanceOverview();v30RestoreAuxiliaryValues();v30RenderMarkList();loadGeometryPairForSelection();
+}
+async function v30RequireEditableSnapshot(){
+ const s=await api("/api/phase45/active/editor");
+ if(s.site_id!==siteId || s.editable!==true || !s.geometry_digest || !s.revision_id)
+  throw Error("ไม่มี Active Working Copy ที่แก้ Landmark ได้");
+ v30GeometrySnapshot=s;
+ return s;
+}
+function v30LegacyError(error){
+ document.getElementById('geometryStatus').textContent='ไม่สามารถแก้ Historical Draft: '+String(error);
+}
+async function v30LegacyMutate(action,key=null,mark=null,confirmToken=null){
+ const d=v30LegacyEvidence;
+ if(!d || !d.draft || !siteId || d.site_id!==siteId)throw Error('โหลดข้อมูล Session และ Site ใหม่ก่อน');
+ const snapshot=await v30RequireEditableSnapshot();
+ if(snapshot.revision_id!==d.revision_id)throw Error('Active Revision เปลี่ยนไปแล้ว');
+ if(d.draft.editable!==true)throw Error('ไม่มี Working Copy ที่แก้ไขได้');
+ const payload={site_id:siteId,revision_id:d.revision_id,expected_digest:d.draft.digest,action,key,mark,confirm:confirmToken};
+ await api(`/api/phase45/active/legacy-evidence/${d.phase}/${d.pair}`,{
+  method:'POST',body:JSON.stringify(payload)
+ });
+ geometryClickA=null;geometryClickB=null;v30LegacyEditingKey=null;
+ if(!v30LegacyIsDraft())document.getElementById('v30LegacyImageMode').value='draft';
+ await v30LoadLegacyPair();
+}
+async function v30LegacyDelete(key){
+ if(!confirm(`ลบจุด ${key} ออกจากชุด Historical Draft?\n\nไฟล์ต้นฉบับจะไม่ถูกลบ จุดอื่นและจุดใหม่ใน Draft จะยังอยู่\nการแก้นี้ยังไม่เข้า Solver/Runtime`))return;
+ await v30LegacyMutate('delete',key);
+}
+async function v30LegacySave(){
+ if(!v30LegacyIsDraft())return;
+ if(!geometryClickA || !geometryClickB)throw Error('คลิกพิกัด A และ B บนภาพ Session ต้นฉบับก่อน');
+ const mark={x_a_px:geometryClickA.x,y_a_px:geometryClickA.y,x_b_px:geometryClickB.x,y_b_px:geometryClickB.y};
+ await v30LegacyMutate(v30LegacyEditingKey?'update':'add',v30LegacyEditingKey,mark);
+}
+async function v30LegacyClear(){
+ const data=v30LegacyEvidence;
+ if(!data || !v30LegacyIsDraft())return;
+ const phrase=`CLEAR ${data.phase.toUpperCase()} ${data.pair}`;
+ if(prompt(`ล้างจุดเก่าและจุดใหม่ใน Historical Draft ของ ${data.phase} Pair ${data.pair} ทั้งหมด?\nพิมพ์ ${phrase} เพื่อยืนยัน (ต้นฉบับยังอยู่)`)!==phrase)return;
+ await v30LegacyMutate('clear',null,null,phrase);
+}
+async function v30LegacyRestoreAll(){
+ const data=v30LegacyEvidence;
+ if(!data || !v30LegacyIsDraft())return;
+ const phrase=`RESTORE ${data.phase.toUpperCase()} ${data.pair}`;
+ if(prompt(`คืนทุกจุดจาก Session ต้นฉบับและล้างการแก้ไข Draft ทั้ง Pair?\nพิมพ์ ${phrase}`)!==phrase)return;
+ await v30LegacyMutate('reset',null,null,phrase);
+}
+async function v30DeleteSavedMark(index){
+ const phase=document.getElementById("geometryPhase").value;
+ const pair=document.getElementById("geometryPair").value;
+ const marks=v30CurrentMarks();
+ if(!Number.isInteger(index)||index<0||index>=marks.length)return;
+ if(!window.confirm(`ลบ Landmark #${index+1} ของ ${phase} Pair ${pair} จาก Working Copy?\nผล Geometry Solve/Verification เดิมจะไม่ใช้ได้จนกว่าจะคำนวณใหม่`))return;
+ const expectedMark=JSON.stringify(marks[index]);
+ const s=await v30RequireEditableSnapshot();
+ const latestMark=s.marks?.[phase]?.[pair]?.[index];
+ if(JSON.stringify(latestMark)!==expectedMark) throw Error("รายการจุดถูกแก้จากหน้าต่างอื่น กรุณา Refresh");
+ await api("/api/phase45/active/marks",{method:"POST",body:JSON.stringify({
+  site_id:siteId,revision_id:s.revision_id,expected_digest:s.geometry_digest,
+  action:"delete",phase,pair,index
+ })});
+ const state=await api(`/api/wizard/state/${siteId}`);wizardState=state.state;
+ v30SelectedMark=-1;await v30LoadGeometrySnapshot();
+ document.getElementById("geometryStatus").textContent=
+  `ลบ Landmark #${index+1} แล้ว · ต้อง Solve และ Verify Geometry ใหม่ก่อน Publish`;
+}
+
+
+// Stage 3A.1: reuse the existing point list and fit endpoint; do not create a second editor.
+// Start is an in-memory replacement draft. Previous Candidate/Revision stay byte-identical
+// until the original guarded Fit endpoint succeeds.
+document.getElementById('btnReplaceDistance').onclick=async()=>{
+ const status=document.getElementById('distanceStatus');
+ if(!siteId || !wizardState){status.textContent='ต้องเลือกไซต์และโหลดข้อมูลก่อน';return;}
+ try{
+  const mode=await v30CameraInventoryGuard();
+  if(mode.mode==='blocked' || (mode.mode==='active' && !(await v30RequireEditableSnapshot()).editable))
+    throw Error('ต้องมี Working Copy ที่แก้ไขได้ก่อนเริ่ม Calibration ใหม่');
+ }catch(e){status.textContent='เริ่มวัดใหม่ไม่ได้: '+String(e);return;}
+ if(!confirm('เริ่มเก็บ Distance Calibration ใหม่ทั้งชุด?\n\nล้างเฉพาะรายการจุดในหน้าเว็บที่กำลังแก้ ไม่ลบโมเดล Candidate/Active เดิมทันที\nต้องวัดจริงอย่างน้อย 5 จุด แล้ว Fit + Verification ใหม่\n\nตกลงเพื่อเริ่มใหม่'))return;
+ distancePoints=[];distanceClick=null;v30DistanceReplaceMode=true;v30DistanceDirty=true;
+ document.getElementById('distanceY').textContent='—';
+ renderDistancePoints();v30DistanceDirtyLabel();v30RenderDistanceOverview();loadDistanceImage();
+ status.textContent='เริ่มวัดใหม่แล้วใน Browser Draft (ยังไม่มีไฟล์ถูกเปลี่ยน) · เลือก Preset แล้วคลิกจุดจริงบนภาพ พร้อมกรอกระยะจริง · Fit อย่างน้อย 5 จุด';
+};
 
 document
     .getElementById("btnAddDistance")
     .onclick =
 ()=>{
-    if(!distanceClick)return;
-
+    if(!distanceClick){
+        document.getElementById('distanceStatus').textContent='เลือก Y Pixel บนภาพก่อนเพิ่มจุดวัด';return;
+    }
+    // Historical model but missing raw points: require an explicit replacement.
+    if(v30HasFittedModelWithoutRawSamples() && !v30DistanceReplaceMode){
+        document.getElementById('distanceStatus').textContent=
+          'มีโมเดลเดิมแต่ไม่มี Raw Samples · กดเริ่มวัดใหม่ / แทนที่ทั้งชุดก่อนเพิ่มจุด';return;
+    }
     const distance =
         Number(
             document
@@ -2361,8 +2921,15 @@ document
             .value
         );
 
-    if(!(distance > 0))return;
-
+    if(!Number.isFinite(distance)||distance<=0){
+        document.getElementById('distanceStatus').textContent='กรอกระยะจริงมากกว่า 0 เมตร';return;
+    }
+    if(!Number.isFinite(distanceClick.y)||distanceClick.y<0||distanceClick.y>=720){
+        document.getElementById('distanceStatus').textContent='Y Pixel อยู่นอกภาพ';return;
+    }
+    if(distancePoints.some(p=>Math.abs(Number(p.distance_m)-distance)<1e-8)){
+        document.getElementById('distanceStatus').textContent='ระยะนี้มีอยู่ในรายการแล้ว แก้ไขจุดเดิมแทนการเพิ่มซ้ำ';return;
+    }
     distancePoints.push({
         distance_m:
             distance,
@@ -2371,44 +2938,67 @@ document
     });
 
     renderDistancePoints();
+    v30DistanceDirty=true;
+    v30DistanceDirtyLabel();v30RenderDistanceOverview();
+    loadDistanceImage();
 };
 
 
+// Stage 3A: one authoritative list, editable in place without another panel.
+// Editing only changes local draft until existing Fit API succeeds.
 function renderDistancePoints(){
-
-    const root =
-        document
-        .getElementById("distancePoints");
-
-    root.innerHTML =
-        distancePoints.map(
-            (point,index)=>`
-            <div class="point">
-                <span>
-                    #${index+1}
-                    · ${point.distance_m.toFixed(2)} m
-                    · Y=${point.y_px.toFixed(1)} px
-                </span>
-                <button
-                    class="red"
-                    onclick="removeDistance(${index})"
-                >
-                    ลบ
-                </button>
-            </div>
-            `
-        ).join("");
+ const root=document.getElementById("distancePoints");
+ root.replaceChildren();
+ distancePoints.forEach((p,i)=>{
+  const row=document.createElement('div');row.className='point';
+  const span=document.createElement('span');
+  span.textContent=`#${i+1} · ${Number(p.distance_m).toFixed(2)} m · Y=${Number(p.y_px).toFixed(1)} px`;
+  const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='แก้ไข';
+  edit.onclick=()=>window.v30EditDistance(i);
+  const del=document.createElement('button');del.type='button';del.className='red';del.textContent='ลบ';
+  del.onclick=()=>window.removeDistance(i);
+  row.append(span,edit,del);root.append(row);
+ });
+ if(v30DistanceDirty){
+  const revert=document.createElement('button');revert.type='button';revert.className='secondary';
+  revert.textContent='ยกเลิกการแก้ที่ยังไม่ Fit';
+  revert.onclick=()=>{
+   if(!confirm('คืนรายการ Distance จาก Wizard State ที่บันทึกล่าสุด? การแก้ที่ยังไม่ Fit จะหายไป'))return;
+   const saved=wizardState?.distance?.points;
+   distancePoints=Array.isArray(saved)?saved.filter(v30ValidDistancePoint).map(p=>({distance_m:Number(p.distance_m),y_px:Number(p.y_px)})):[];
+   v30DistanceDirty=false;v30DistanceReplaceMode=false;renderDistancePoints();v30DistanceDirtyLabel();v30RenderDistanceOverview();loadDistanceImage();
+  };
+  root.append(revert);
+ }
 }
-
-
-window.removeDistance =
-index=>{
-    distancePoints.splice(
-        index,
-        1
-    );
-
-    renderDistancePoints();
+function v30ParseNewPositive(input){
+ if(input===null||typeof input!=='string'||!input.trim())return null;
+ const n=Number(input);
+ return Number.isFinite(n)&&n>0?n:null;
+}
+window.v30EditDistance=index=>{
+ if(!Number.isInteger(index)||index<0||index>=distancePoints.length)return;
+ const current=distancePoints[index];
+ const metersRaw=prompt(`แก้ระยะจริง (เมตร) จุด #${index+1}`,String(current.distance_m));
+ if(metersRaw===null)return;
+ const meters=v30ParseNewPositive(metersRaw);
+ if(meters===null){alert('ระยะต้องเป็นตัวเลขมากกว่า 0');return;}
+ const yRaw=prompt(`แก้ Y Pixel (0–719) จุด #${index+1}`,String(current.y_px));
+ if(yRaw===null)return;
+ const y=yRaw.trim()?Number(yRaw):NaN;
+ if(!Number.isFinite(y)||y<0||y>=720){alert('Y ต้องอยู่ในภาพ 1280×720 (0–719.999...)');return;}
+ if(!confirm(`แก้จุด #${index+1} เป็น ${meters} เมตร / Y=${y.toFixed(1)} px?\nยังไม่บันทึกจนกว่าจะกด Fit Model ใหม่`))return;
+ if(distancePoints.some((p,j)=>j!==index && Math.abs(Number(p.distance_m)-meters)<1e-8)){
+  alert('ระยะจริงนี้ซ้ำกับจุดอื่น');return;
+ }
+ distancePoints[index]={distance_m:meters,y_px:y};
+ v30DistanceDirty=true;renderDistancePoints();v30DistanceDirtyLabel();v30RenderDistanceOverview();loadDistanceImage();
+};
+window.removeDistance=index=>{
+ if(!Number.isInteger(index)||index<0||index>=distancePoints.length)return;
+ if(!confirm(`ลบจุด Distance #${index+1} จากรายการที่กำลังแก้?\nยังไม่เขียนไฟล์จนกว่าจะ Fit ใหม่`))return;
+ distancePoints.splice(index,1);v30DistanceDirty=true;
+ renderDistancePoints();v30DistanceDirtyLabel();v30RenderDistanceOverview();loadDistanceImage();
 };
 
 
@@ -2417,22 +3007,51 @@ document
     .onclick =
 async()=>{
     if(!siteId)return;
+    // Client-side defense in depth. Existing server Candidate API is unchanged.
+    try {
+        const mode=await v30CameraInventoryGuard();
+        if(mode.mode==="blocked" || (mode.mode==="active" &&
+           !(await v30RequireEditableSnapshot()).editable))
+            throw Error("Site ไม่อยู่ในสถานะ Working Copy ที่แก้ได้");
+        if(v30HasFittedModelWithoutRawSamples() && !v30DistanceReplaceMode)
+          throw Error('มีโมเดลเดิมที่ไม่มี Raw Samples · ต้องเริ่มวัดใหม่ / แทนที่ทั้งชุดก่อน Fit');
+        if(v30DistanceReplaceMode && distancePoints.length<5)
+          throw Error('การแทนที่ทั้งชุดต้องมีจุดวัดจริงอย่างน้อย 5 จุด · ห้ามใช้ Y≈ จากสมการเก่ามา Fit');
+        if(distancePoints.length<3)throw Error("ต้องมี Raw Samples อย่างน้อย 3 จุดก่อน Fit · ไม่อนุญาตลบโมเดลที่ใช้งานอยู่โดยไม่มีโมเดลใหม่");
+        if(new Set(distancePoints.map(p=>String(p.distance_m))).size!==distancePoints.length)
+          throw Error("ระยะของจุดตัวอย่างซ้ำกัน · แก้จุดซ้ำก่อน Fit");
+        if(v30DistanceReplaceMode){
+          const typed=window.prompt('ยืนยันว่าทุกจุดเป็นค่าที่วัดจริง ไม่ใช่ค่าคำนวณจากสมการเดิม\nพิมพ์ REPLACE เพื่อแทนโมเดล Distance ใน Working Copy หลัง Fit สำเร็จ');
+          if(typed!=='REPLACE')return;
+        }else if(mode.mode==="active" && !window.confirm(
+             "คำนวณ Distance Model ใหม่จากรายการปัจจุบัน?\nอาจกระทบ Calibration และ Verification ที่อ้างอิงโมเดลเดิม\nต้อง Verify/ตรวจ Geometry ใหม่ก่อน Publish")) return;
+    } catch(error) {
+        document.getElementById("distanceStatus").textContent="Fit ถูกบล็อก: "+String(error);
+        return;
+    }
 
-    const data =
-        await api(
-            `/api/wizard/${siteId}/distance/fit`,
-            {
-                method:"POST",
-                body:JSON.stringify({
-                    points:
-                        distancePoints
-                })
-            }
-        );
-
-    const c =
-        data.candidate;
-
+    let data;
+    try{
+        data=await api(`/api/wizard/${encodeURIComponent(siteId)}/distance/fit`,{
+            method:'POST',body:JSON.stringify({points:distancePoints.map(p=>({...p})),expected_updated_at:wizardState?.updated_at})
+        });
+    }catch(e){document.getElementById('distanceStatus').textContent='Fit ไม่สำเร็จ · เก็บรายการแก้ไว้ในหน้าเว็บ ยังไม่มีการยืนยันบันทึก: '+String(e);return;}
+    const c = data.candidate;
+    if(wizardState && data.wizard_updated_at)wizardState.updated_at=data.wizard_updated_at;
+    v30DistanceDirty=false;v30DistanceReplaceMode=false;
+    if(wizardState){
+        wizardState.distance=wizardState.distance||{};
+        wizardState.distance.points=distancePoints.map(p=>({...p}));
+        wizardState.distance.candidate=c;
+        wizardState.distance.verifications=[];
+    }
+    v30RenderVerifications();
+    document.getElementById('geometryStatus').textContent=
+       'Distance Model เปลี่ยน · Geometry Trial/Solve เดิมถูกทำเครื่องหมายว่าต้องตรวจใหม่ใน Working Copy';
+    v30DistanceDirtyLabel();renderDistancePoints();
+    // Old verification events refer to an earlier fit; show caveat instead of claiming they are current.
+    v30RenderDistanceOverview();
+    document.getElementById('verifyStatus').textContent='Distance Model มีการ Fit ใหม่ · ต้อง Verify ด้วยค่าที่วัดใหม่ก่อนใช้ผลตรวจ';
     document
         .getElementById("distanceStatus")
         .textContent =
@@ -2446,51 +3065,35 @@ async()=>{
 };
 
 
-document
-    .getElementById("btnVerifyDistance")
-    .onclick =
-async()=>{
-    if(!siteId)return;
-
-    const y =
-        Number(
-            document
-            .getElementById("verifyY")
-            .value
-        );
-
-    const actual =
-        Number(
-            document
-            .getElementById("verifyMeters")
-            .value
-        );
-
-    const data =
-        await api(
-            `/api/wizard/${siteId}/distance/verify`,
-            {
-                method:"POST",
-                body:JSON.stringify({
-                    y_px:y,
-                    actual_distance_m:
-                        actual
-                })
-            }
-        );
-
-    const v =
-        data.verification;
-
-    document
-        .getElementById("verifyStatus")
-        .textContent =
-        `Predicted = ${v.predicted_distance_m.toFixed(3)} m\n`
-        + `Actual = ${v.actual_distance_m.toFixed(3)} m\n`
-        + `Error = ${v.signed_error_m.toFixed(3)} m\n`
-        + `Absolute = ${v.absolute_error_m.toFixed(3)} m\n`
-        + `Percent = ${v.percent_error.toFixed(2)}%\n`
-        + `Grade = ${v.grade}`;
+document.getElementById('btnVerifyDistance').onclick=async()=>{
+ if(!siteId)return;
+ const yEl=document.getElementById('verifyY'),actualEl=document.getElementById('verifyMeters');
+ const box=document.getElementById('verifyStatus');
+ if(!yEl.value.trim()||!actualEl.value.trim()){
+  box.textContent='ต้องกรอกระยะจริงและ Y Pixel ที่วัดได้ก่อน Verify';return;
+ }
+ const y=Number(yEl.value), actual=Number(actualEl.value);
+ if(!Number.isFinite(y)||y<0||y>=720||!Number.isFinite(actual)||actual<=0){
+  box.textContent='ระยะจริงต้องมากกว่า 0 และ Y Pixel อยู่ในภาพ (0–719.999...)';return;
+ }
+ if(v30DistanceDirty){box.textContent='ยังมีจุด Distance ที่แก้แต่ไม่ได้ Fit · Fit ให้เรียบร้อยก่อน Verify';return;}
+ try{
+  const policy=await v30CameraInventoryGuard();
+  if(policy.mode==='blocked'||(policy.mode==='active'&&!(await v30RequireEditableSnapshot()).editable))
+   throw Error('ต้องใช้ Working Copy ที่แก้ไขได้เพื่อบันทึก Verification');
+  const data=await api(`/api/wizard/${encodeURIComponent(siteId)}/distance/verify`,{
+    method:'POST',body:JSON.stringify({y_px:y,actual_distance_m:actual,expected_updated_at:wizardState?.updated_at})
+  });
+  const v=data.verification;
+  if(wizardState && data.wizard_updated_at)wizardState.updated_at=data.wizard_updated_at;
+  if(wizardState){wizardState.distance=wizardState.distance||{};
+    wizardState.distance.verifications=wizardState.distance.verifications||[];
+    wizardState.distance.verifications.push(v);}
+  v30RenderVerifications();
+  box.textContent=`Predicted=${Number(v.predicted_distance_m).toFixed(3)} m\nActual=${Number(v.actual_distance_m).toFixed(3)} m\n`+
+  `Error=${Number(v.signed_error_m).toFixed(3)} m | Absolute=${Number(v.absolute_error_m).toFixed(3)} m\n`+
+  `Percent=${Number(v.percent_error).toFixed(2)}% | Grade=${v.grade}`;
+ }catch(e){box.textContent='Verify ไม่สำเร็จ: '+String(e);}
 };
 
 
@@ -2571,6 +3174,7 @@ function clearGeometryCanvas(
 
 function loadGeometryPair(){
 
+    if(v30LegacyMode()){v30LoadLegacyPair();return;}
     if(!wizardState){
         return;
     }
@@ -2602,6 +3206,9 @@ function loadGeometryPair(){
 
     geometryClickA = null;
     geometryClickB = null;
+    v30SelectedMark=-1;
+    v30EditingIndex=-1;
+    document.getElementById("btnSaveMark").textContent="บันทึก Landmark";
 
     const canvasA =
         document
@@ -2640,6 +3247,8 @@ function loadGeometryPair(){
             `ไม่มี ${info.phase.toUpperCase()} capture ของ P${b}`
         );
     }
+
+    v30RenderMarkList();
 
     const missing = [];
 
@@ -2704,7 +3313,13 @@ document
     .getElementById("geometryA")
     .onclick =
 event=>{
-
+    if(v30LegacyMode()){
+       if(v30LegacyIsDraft()){
+        geometryClickA=canvasPoint(event.currentTarget,event);
+        v30LegacyPaint();
+       }
+       return;
+    }
     const info =
         geometryPhaseInfo();
 
@@ -2751,7 +3366,13 @@ document
     .getElementById("geometryB")
     .onclick =
 event=>{
-
+    if(v30LegacyMode()){
+       if(v30LegacyIsDraft()){
+        geometryClickB=canvasPoint(event.currentTarget,event);
+        v30LegacyPaint();
+       }
+       return;
+    }
     const info =
         geometryPhaseInfo();
 
@@ -2798,7 +3419,10 @@ document
     .getElementById("btnSaveMark")
     .onclick =
 async()=>{
-
+    if(v30LegacyMode()){
+        if(v30LegacyIsDraft())await v30LegacySave().catch(v30LegacyError);
+        return;
+    }
     const status =
         document
         .getElementById("geometryStatus");
@@ -2837,29 +3461,29 @@ async()=>{
             .getElementById("geometryPhase")
             .value;
 
-        const data =
-            await api(
-                `/api/wizard/${siteId}/geometry/mark`,
-                {
-                    method:"POST",
-                    body:JSON.stringify({
-                        pair,
-                        phase,
-
-                        x_a_px:
-                            geometryClickA.x,
-
-                        y_a_px:
-                            geometryClickA.y,
-
-                        x_b_px:
-                            geometryClickB.x,
-
-                        y_b_px:
-                            geometryClickB.y,
-                    })
-                }
-            );
+        const mark={x_a_px:geometryClickA.x,y_a_px:geometryClickA.y,
+                    x_b_px:geometryClickB.x,y_b_px:geometryClickB.y};
+        const mode=await v30CameraInventoryGuard();
+        let data;
+        if(mode.mode==="active"){
+            const prior=v30EditingIndex>=0?v30CurrentMarks()[v30EditingIndex]:null;
+            const priorJSON=prior?JSON.stringify(prior):null;
+            const snap=await v30RequireEditableSnapshot();
+            if(priorJSON && priorJSON!==JSON.stringify(snap.marks?.[phase]?.[pair]?.[v30EditingIndex]))
+                throw Error("Landmark เดิมถูกแก้จากหน้าต่างอื่น กรุณา Refresh ก่อน");
+            data=await api("/api/phase45/active/marks",{
+                method:"POST",body:JSON.stringify({
+                    site_id:siteId,revision_id:snap.revision_id,
+                    expected_digest:snap.geometry_digest,phase,pair,
+                    action:v30EditingIndex>=0?"update":"add",index:v30EditingIndex>=0?v30EditingIndex:undefined,mark
+                })
+            });
+        }else if(mode.mode==="setup"){
+            if(v30EditingIndex>=0)throw Error("Edit เฉพาะ Active Working Copy; Site ใหม่ใช้ล้าง Pair หรือเพิ่มจุด");
+            data=await api(`/api/wizard/${siteId}/geometry/mark`,{
+                method:"POST",body:JSON.stringify({pair,phase,...mark})
+            });
+        }else throw Error("Site นี้ไม่อยู่ในสถานะแก้ไข Landmark");
 
         const state =
             await api(
@@ -2869,14 +3493,11 @@ async()=>{
         wizardState =
             state.state;
 
+        v30EditingIndex=-1;
+        await v30LoadGeometrySnapshot();
         loadGeometryPair();
-
-        status.textContent =
-            `Saved · ${phase.toUpperCase()} `
-            +
-            `Pair ${pair} · `
-            +
-            `Count ${data.count}/3`;
+        status.textContent = `บันทึก ${phase.toUpperCase()} Pair ${pair} สำเร็จ · `+
+          `${v30CurrentMarks().length} จุด · ต้อง Solve และ Verify Geometry ใหม่`;
 
     }catch(error){
 
@@ -2892,7 +3513,10 @@ document
     .getElementById("btnClearMarks")
     .onclick =
 async()=>{
-
+    if(v30LegacyMode()){
+        if(v30LegacyIsDraft())await v30LegacyClear().catch(v30LegacyError);
+        return;
+    }
     if(!siteId){
         return;
     }
@@ -2913,6 +3537,13 @@ async()=>{
             .getElementById("geometryPhase")
             .value;
 
+        const mode=await v30CameraInventoryGuard();
+        if(mode.mode==="active"){
+            status.textContent="Active Site: โปรดลบทีละจุดจากรายการหมายเลขด้านล่าง เพื่อให้ผ่าน Digest Guard";
+            return;
+        }
+        if(mode.mode!=="setup") throw Error("Site ไม่อยู่ในสถานะแก้ไข");
+        if(!window.confirm(`ล้าง Landmark ทุกจุดของ ${phase} Pair ${pair}?`)) return;
         await api(
             `/api/wizard/${siteId}/geometry/clear`,
             {
@@ -2932,6 +3563,7 @@ async()=>{
         wizardState =
             state.state;
 
+        await v30LoadGeometrySnapshot();
         loadGeometryPair();
 
         status.textContent =
@@ -2963,6 +3595,13 @@ async()=>{
 
 
     try{
+        if(v30LegacyMode()){
+            document.getElementById('geometryStatus').textContent=
+              'หลักฐานเดิมแยกจากภาพปัจจุบัน: Training/Holdout ตาม Session A/B\n'+
+              'ใช้ปุ่มเตรียมข้อมูลเพื่อยืนยันใช้ชุดแก้ไข Historical Draft แบบ LAB เท่านั้น\n'+
+              'ต้อง Solve และตรวจภาคสนามใหม่ก่อนใช้กับงานความปลอดภัยจริง';
+            return;
+        }
 
         const data =
             await api(
@@ -3053,13 +3692,22 @@ async()=>{
 
 
     try{
-
+        const historical=v30LegacyIsDraft();
+        if(v30LegacyMode() && !historical) throw Error('หลักฐานต้นฉบับเป็นแบบอ่านอย่างเดียว');
+        let body={source:'current_wizard'};
+        if(historical){
+            if(!window.confirm('ใช้ Landmark จาก Session เดิมทุก Pair (Train + Holdout) เพื่อเตรียม Solver ใช่หรือไม่?\n\nภาพ Session แตกต่างจากภาพปัจจุบัน\nผลได้เฉพาะการทดลอง LAB ยังไม่ผ่านการยืนยันความแม่นยำภาคสนาม\nไม่เปลี่ยน Runtime ที่ใช้งานอยู่')) return;
+            body={source:'historical_draft_lab_only',confirm_site_id:siteId,
+              confirm_revision_id:'rev-20261009T065702Z-6090a06a5d93',
+              acknowledge_source_sessions:true,acknowledge_lab_only:true,
+              acknowledge_field_verification:true};
+        }
         const data =
             await api(
                 `/api/geometry-adapter/${siteId}/prepare`,
                 {
                     method:"POST",
-                    body:"{}",
+                    body:JSON.stringify(body),
                 }
             );
 
@@ -3073,7 +3721,8 @@ async()=>{
             +
             `Manifest: ${data.manifest}\n`
             +
-            "Runtime changed: false";
+            "Runtime changed: false" + (historical ?
+            "\nแหล่งข้อมูล: Landmark Session เดิม (LAB เท่านั้น)\nต้อง Solve / Independent Holdout / Field Verification ใหม่" : "");
 
         hideGeometryForceOverride();
 
@@ -3393,7 +4042,12 @@ async()=>{
     }
 
 
+    if(v30LegacyMode() && !v30LegacyIsDraft()){
+        document.getElementById('geometryStatus').textContent='กรุณาเลือกชุดแก้ไข Draft ไม่ใช่หลักฐานต้นฉบับ';
+        return;
+    }
     const accepted = confirm(
+        (v30LegacyIsDraft()?"ผลคำนวณจาก Historical Session เป็น LAB เท่านั้น ต้องตรวจความแม่นยำภาคสนามใหม่\n\n":"")+
         "คำนวณ Geometry ด้วย "
         +
         "solve_final_mixed_rotation_AB_v3.py "
@@ -3466,14 +4120,9 @@ async()=>{
     }
 
 
-    const value =
-        Number(
-            document
-            .getElementById(
-                "northBearing"
-            )
-            .value
-        );
+    const northRaw=document.getElementById('northBearing').value.trim();
+    if(!northRaw){document.getElementById('northStatus').textContent='ยังไม่ได้กรอก True North · ไม่บันทึกค่า 0 อัตโนมัติ';return;}
+    const value=Number(northRaw);
 
 
     if(
@@ -3561,30 +4210,16 @@ async()=>{
     }
 
 
-    const latitude =
-        Number(
-            document
-            .getElementById(
-                "cameraLat"
-            )
-            .value
-        );
-
-
-    const longitude =
-        Number(
-            document
-            .getElementById(
-                "cameraLon"
-            )
-            .value
-        );
+    const latRaw=document.getElementById('cameraLat').value.trim();
+    const lonRaw=document.getElementById('cameraLon').value.trim();
+    if(!latRaw||!lonRaw){document.getElementById('locationStatus').textContent='กรอก Latitude และ Longitude ให้ครบ · ไม่บันทึก 0 จากช่องว่าง';return;}
+    const latitude=Number(latRaw),longitude=Number(lonRaw);
 
 
     if(
-        !Number.isFinite(latitude)
+        !Number.isFinite(latitude) || latitude < -90 || latitude > 90
         ||
-        !Number.isFinite(longitude)
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180
     ){
 
         document
@@ -3641,6 +4276,8 @@ async()=>{
                 null,
                 2
             );
+        document.getElementById('locationStatus').textContent +=
+          '\nบันทึกพิกัดกล้องฉบับร่างแล้ว · ทะเบียนพื้นที่ในขั้นตอนที่ 1 ไม่เปลี่ยน (ต้องบันทึกแยก)';
 
 
     }catch(error){
@@ -3936,22 +4573,22 @@ async function loadIntrinsicsStatus(){
         || {};
 
 
-    box.textContent =
-        `Captures: ${s.captures}\n`
-        +
-        `Minimum: ${s.minimum_views}\n`
-        +
-        `Recommended: ${s.recommended_views.min}-${s.recommended_views.max}\n`
-        +
-        `Fit ready: ${s.fit_ready}\n\n`
-        +
-        `Active exists: ${active.exists}\n`
-        +
-        `Active production valid: ${active.production_valid ?? false}\n\n`
-        +
-        `Candidate exists: ${candidate.exists}\n`
-        +
-        `Candidate production valid: ${candidate.production_valid ?? false}`;
+    // Status API already carries the calibrated values; older UI hid them behind existence flags.
+    const formatIntrinsics=(entry,source)=>{
+        if(!entry?.exists)return `${source}: ไม่มี Artifact`;
+        const q=entry.summary||{};
+        const size=(q.frame_width!=null && q.frame_height!=null)
+            ?`${q.frame_width}×${q.frame_height}`:'—';
+        const metric=(v,unit='')=>Number.isFinite(Number(v)) && v!==null && v!==undefined
+            ?`${Number(v).toFixed(3)}${unit}`:'—';
+        return `${source}: ${q.status||'มี Artifact'} | ${size} | `+
+         `RMS=${metric(q.opencv_rms_px,' px')} | Mean Reprojection=${metric(q.mean_reprojection_px,' px')} | `+
+         `HFOV=${metric(q.effective_hfov_deg,'°')} | Views used=${q.views_used??'—'} | `+
+         `Production valid=${entry.production_valid===true?'YES':'NO'}`;
+    };
+    box.textContent=`Captures: ${s.captures} | Minimum: ${s.minimum_views} | `+
+     `Recommended: ${s.recommended_views.min}–${s.recommended_views.max} | Fit ready: ${s.fit_ready}\n`+
+     formatIntrinsics(active,'Active')+'\n'+formatIntrinsics(candidate,'Candidate');
 }
 
 
@@ -4126,7 +4763,170 @@ async()=>{
 };
 
 
+// In-place Camera Connection migration from the obsolete v2.5a Site Editor.
+// The existing Wizard form is authoritative; no duplicate DOM controls or new frontend.
+let v30CameraMode = "blocked";
+let v30CameraSnapshot = null;
+const v30CameraFields = ["setupCameraIp", "setupCameraPort", "setupCameraUser",
+                         "setupCameraPassword", "setupRtspPort", "setupRtspPath"];
+
+function v30CameraGate(mode) {
+    v30CameraMode = mode;
+    const editable = mode === "setup" || (mode === "active" &&
+        v30CameraSnapshot?.editable === true && v30CameraSnapshot?.mode === "LAB");
+    for (const id of v30CameraFields) document.getElementById(id).disabled = !editable;
+    document.getElementById("btnSaveCameraSetup").disabled = !editable;
+    document.getElementById("btnTestCameraSetup").disabled = !editable ||
+        (mode === "active" && !(v30CameraSnapshot.changed_from_active ||
+                                  v30CameraSnapshot.camera_test_required));
+    document.getElementById("btnSaveCameraSetup").textContent =
+        mode === "active" ? "บันทึก Camera Draft" : "บันทึก Camera Candidate";
+    document.getElementById("v30CameraMaintenance").classList.toggle("hidden",mode!=="active");
+    document.getElementById("v30CameraDraft").disabled =
+        mode!=="active" || v30CameraSnapshot?.editable === true || v30CameraSnapshot?.mode!=="LAB";
+    const showAttest = mode==="active" && editable &&
+        v30CameraSnapshot.changed_from_active && v30CameraSnapshot.camera_test_passed &&
+        !v30CameraSnapshot.camera_test_required;
+    document.getElementById("v30CameraAttestation").classList.toggle("hidden",!showAttest);
+    document.getElementById("v30CameraAttest").disabled=!showAttest;
+}
+
+async function v30CameraInventoryGuard() {
+    const selected=siteId;
+    if (!selected) throw Error("เลือก Site ก่อน");
+    const inv=await api("/api/runtime-sites");
+    if (!Array.isArray(inv.sites)) throw Error("Site Inventory ไม่ถูกต้อง");
+    if (selected!==siteId) throw Error("Site เปลี่ยนระหว่างทำงาน กรุณาโหลดใหม่");
+    const site=inv.sites.find(s=>s.site_id===selected);
+    if (!site) throw Error("ไม่พบ Site ใน Inventory");
+    if (inv.active_site===selected) return {mode:"active",inventory:inv,site};
+    if (site.active || (site.revisions||[]).length || site.working_copy?.recovery)
+        return {mode:"blocked",inventory:inv,site};
+    return {mode:"setup",inventory:inv,site};
+}
+
+function v30CameraShowActive(c) {
+    if (c.site_id!==siteId) throw Error("กล้อง Active Site ไม่ตรงกับที่เลือก");
+    v30CameraSnapshot=c;
+    const cam=c.selected_camera || {};
+    for(const [id,key] of [["setupCameraIp","camera_ip"],["setupCameraPort","camera_port"],
+                            ["setupRtspPort","rtsp_port"],["setupRtspPath","rtsp_path"]])
+        document.getElementById(id).value=cam[key]??"";
+    document.getElementById("setupCameraUser").value="";
+    document.getElementById("setupCameraPassword").value="";
+    document.getElementById("setupCameraUser").placeholder="เว้นว่างเพื่อใช้บัญชีเดิม";
+    document.getElementById("setupCameraPassword").placeholder="เว้นว่างเพื่อใช้รหัสเดิม";
+    v30CameraGate("active");
+    document.getElementById("cameraSetupStatus").textContent=
+        `Active Site: ${c.site_id} / ${c.revision_id}\n`+
+        `ข้อมูลจาก: ${c.source} · ${c.mode}\n`+
+        `Camera: ${cam.camera_ip||"-"} · HTTP ${cam.camera_port||"-"} · RTSP ${cam.rtsp_port||"-"}${cam.rtsp_path||""}\n`+
+        `Username: ${cam.camera_user_hint||"-"} · Password: ${cam.password_configured?"ตั้งค่าแล้ว":"ยังไม่มี"}\n`+
+        `Working Copy: ${c.editable?"แก้ไขได้":"ยังไม่มี"} · Camera Test: ${c.camera_test_passed?"PASS":c.camera_test_required?"REQUIRED":"ยังไม่ผ่าน"}\n`+
+        `ค่าที่แก้จะอยู่ใน Working Copy เท่านั้น Runtime ไม่เปลี่ยนจนกว่าจะ Publish และ Activate`;
+}
+
+async function v30CameraLoad() {
+    const selected=siteId;
+    v30CameraSnapshot=null;
+    v30CameraGate("blocked");
+    const policy=await v30CameraInventoryGuard();
+    if (policy.mode==="active") {
+        const c=await api("/api/phase45/active/camera");
+        if (selected!==siteId || policy.inventory.active_revision!==c.revision_id ||
+            c.site_id!==selected) throw Error("Active Runtime เปลี่ยนระหว่างโหลด กรุณา Refresh");
+        v30CameraShowActive(c);
+    } else if (policy.mode==="blocked") {
+        document.getElementById("cameraSetupStatus").textContent =
+            "Site นี้มี Revision แต่ไม่ได้เป็น Runtime ปัจจุบัน จึงแก้ Camera ไม่ได้ · เลือก Activate ผ่าน Activation Plan ก่อน";
+    } else {
+        v30CameraGate("setup");
+        await v30LoadLegacyCameraSetupStatus();
+    }
+}
+
+async function v30ConfirmCurrent() {
+    if (v30CameraMode!=="active" || !v30CameraSnapshot) throw Error("ต้องโหลด Active Camera อีกครั้ง");
+    const p=await v30CameraInventoryGuard();
+    if (p.mode!=="active" || p.inventory.active_revision!==v30CameraSnapshot.revision_id)
+        throw Error("ACTIVE_IDENTITY_CHANGED_REFRESH_REQUIRED");
+    return v30CameraSnapshot;
+}
+
+async function v30CameraCreateDraft() {
+    const c=await v30ConfirmCurrent();
+    if(c.editable || c.mode!=="LAB") throw Error("รายการนี้ไม่อนุญาตให้สร้าง Draft");
+    if(!confirm(`สร้าง Working Copy จาก ${c.site_id} / ${c.revision_id}?\nจะไม่เขียน Active Runtime และไม่ทับ Draft เดิม`)) return;
+    await api(`/api/runtime-sites/${encodeURIComponent(c.site_id)}/revision/${encodeURIComponent(c.revision_id)}/working-copy`,
+        {method:"POST",body:JSON.stringify({overwrite:false})});
+    await v30CameraLoad();
+}
+
+async function v30CameraSave() {
+    const c=await v30ConfirmCurrent();
+    if(!c.editable || c.mode!=="LAB") throw Error("ต้องสร้าง Active Working Copy ใน LAB ก่อน");
+    const fields={camera_ip:document.getElementById("setupCameraIp").value.trim(),
+        camera_port:document.getElementById("setupCameraPort").value.trim(),
+        rtsp_port:document.getElementById("setupRtspPort").value.trim(),
+        rtsp_path:document.getElementById("setupRtspPath").value.trim()};
+    const u=document.getElementById("setupCameraUser").value;
+    const p=document.getElementById("setupCameraPassword").value;
+    if(u) fields.camera_user=u;
+    if(p) fields.camera_password=p;
+    if(!confirm(`บันทึก Camera Connection ลง Working Copy?\nSite: ${c.site_id}\nIP: ${fields.camera_ip}\nต้องทดสอบกล้องใหม่ก่อน Publish`)) return;
+    await api("/api/phase45/active/camera",{method:"PATCH",body:JSON.stringify({
+        site_id:c.site_id,revision_id:c.revision_id,expected_digest:c.camera_digest,...fields})});
+    await v30CameraLoad();
+}
+
+async function v30CameraTest() {
+    const c=await v30ConfirmCurrent();
+    if(!c.editable || c.mode!=="LAB" || (!c.changed_from_active&&!c.camera_test_required))
+        throw Error("ไม่มี Camera Draft ที่ต้องทดสอบ");
+    if(!confirm("Camera Test จะหยุด Detection ชั่วคราว และพยายามกลับมาเริ่มใหม่\nใช้เฉพาะช่วง LAB Maintenance ที่มีผู้เฝ้าระวังสำรอง\nยืนยันให้ทดสอบหรือไม่?"))return;
+    document.getElementById("cameraSetupStatus").textContent="กำลังทดสอบ Camera Draft · Detection อาจหยุดชั่วคราว...";
+    try {
+        await api("/api/phase45/active/camera/test",{method:"POST",body:JSON.stringify({
+            site_id:c.site_id,revision_id:c.revision_id,expected_digest:c.camera_digest,
+            confirm_detection_interruption:true})});
+        await v30CameraLoad();
+    } catch(e) {
+        await v30CameraLoad().catch(()=>{});
+        throw e;
+    }
+}
+
+async function v30CameraAttest() {
+    const c=await v30ConfirmCurrent();
+    if(!c.editable || !c.camera_test_passed || !c.changed_from_active || c.camera_test_required)
+        throw Error("Camera Test ยังไม่ผ่าน");
+    if (!["v30SameCamera","v30SameMount","v30LabOnly"].every(id=>document.getElementById(id).checked))
+        throw Error("ต้องยืนยันทั้ง 3 ข้อก่อน");
+    const typed=prompt("พิมพ์ Site ID เพื่อรับรองว่าเป็นกล้องตัวเดิม · LAB เท่านั้น",c.site_id);
+    if(typed!==c.site_id) throw Error("ยืนยัน Site ID ไม่ตรง");
+    await api("/api/phase45/active/camera/attest",{method:"POST",body:JSON.stringify({
+        site_id:c.site_id,revision_id:c.revision_id,expected_digest:c.camera_digest,
+        confirm_site_id:typed,same_physical_camera_ack:true,
+        installation_unchanged_ack:true,explicit_lab_only_ack:true})});
+    await v30CameraLoad();
+    document.getElementById("cameraSetupStatus").textContent +=
+        "\nSame-Camera LAB Maintenance ยืนยันแล้ว · ต้อง Final Verification → Publish → Activation Plan";
+}
+
+document.getElementById("v30CameraDraft").onclick=async()=>{
+    try{await v30CameraCreateDraft();}catch(e){document.getElementById("cameraSetupStatus").textContent=String(e);}
+};
+document.getElementById("v30CameraAttest").onclick=async()=>{
+    try{await v30CameraAttest();}catch(e){document.getElementById("cameraSetupStatus").textContent=String(e);}
+};
+
 async function loadCameraSetupStatus(){
+    try {await v30CameraLoad();}
+    catch(e){v30CameraSnapshot=null;v30CameraGate("blocked");
+        document.getElementById("cameraSetupStatus").textContent="Camera Load ถูกบล็อก: "+String(e);}
+}
+
+async function v30LoadLegacyCameraSetupStatus(){
 
     if(!siteId){
         return;
@@ -4225,6 +5025,9 @@ async()=>{
 
 
     try{
+        if(v30CameraMode !== "setup") {await v30CameraSave();return;}
+        const policy=await v30CameraInventoryGuard();
+        if(policy.mode !== "setup") throw Error("Site status changed; refresh before Save");
 
         const data =
             await api(
@@ -4335,6 +5138,18 @@ async()=>{
     }
 
 
+    if(v30CameraMode !== "setup") {
+        try {await v30CameraTest();}
+        catch(e) {document.getElementById("cameraSetupStatus").textContent="Camera Test ถูกบล็อก: "+String(e);}
+        return;
+    }
+    try {
+        const policy=await v30CameraInventoryGuard();
+        if(policy.mode!=="setup")throw Error("Site status changed; refresh before Test");
+    } catch(e) {
+        document.getElementById("cameraSetupStatus").textContent="Camera Test ถูกบล็อก: "+String(e);
+        return;
+    }
     if(
         !confirm(
             "ทดสอบ Camera Candidate จริง?\n\n"
@@ -4607,6 +5422,8 @@ async function loadFinalVerification(){
 
 
     let text =
+        'ขอบเขต: ตรวจข้อมูล Candidate / Wizard State (ไม่ใช่ผลตรวจ Active Runtime)\n'+
+        'สถานะ Active Telegram อาจแตกต่างจาก Telegram Candidate ของ Draft\n\n'+
         `Mode: ${data.mode}\n`
         +
         `Candidate Ready: ${
@@ -4619,11 +5436,13 @@ async function loadFinalVerification(){
         +
         `Warnings: ${data.warning_count}\n`
         +
-        `Activation Engine: ${
+        `ระบบสลับไซต์ (Activation Engine): ${
             data.activation_available
-            ? "AVAILABLE"
-            : "NOT YET INSTALLED"
-        }\n\n`;
+            ? "พร้อมตรวจแผนใช้งานหลังบันทึกเวอร์ชัน"
+            : "ยังติดต่อบริการสลับไซต์ไม่ได้ — ตรวจ Manager Agent"
+        }\n`
+        + (data.activation_next_step ? `ขั้นตอนต่อไป: ตรวจและบันทึกเวอร์ชัน แล้วตรวจแผนสลับไซต์\n` : "")
+        + `\n`;
 
 
     for(
@@ -4648,10 +5467,8 @@ async function loadFinalVerification(){
 
 
         text +=
-            `${icon} [${item.status}] `
-            +
-            `${item.label}\n`
-            +
+            `${icon} [${item.status}] `+
+            `${item.label}${item.source?' · source='+item.source:''}\n`+
             `   ${item.detail}\n`;
     }
 
@@ -4864,7 +5681,7 @@ authState().catch(
                     style="width:100%"
                 >
                     <option value="">
-                        ยังไม่มี Revision
+                        เลือกไซต์เพื่อโหลด Revision
                     </option>
                 </select>
             </div>
@@ -4939,10 +5756,15 @@ authState().catch(
             executeActivation;
 
 
-        loadActivationRevisions()
-        .catch(
-            console.error
-        );
+        if(siteId){
+            loadActivationRevisions().catch(error=>{
+                const box=document.getElementById('activationStatus');
+                if(box)box.textContent='โหลด Revision ไม่สำเร็จ: '+String(error);
+            });
+        }else{
+            document.getElementById('activationStatus').textContent=
+               'เลือกไซต์และโหลดข้อมูลก่อน จึงแสดง Revision ที่มีอยู่จริง';
+        }
     }
 
 
@@ -4975,15 +5797,19 @@ authState().catch(
         }
 
 
-        activate.disabled =
-            true;
-
-
-        const data =
-            await api(
-                `/api/revisions/${siteId}`
-            );
-
+        activate.disabled = true;
+        const requestedSite=siteId;
+        status.textContent='กำลังตรวจ Revision ของ '+requestedSite+'...';
+        let data;
+        try{data=await api(`/api/revisions/${encodeURIComponent(requestedSite)}`);}
+        catch(error){
+            if(siteId===requestedSite){
+                status.textContent='โหลด Revision ไม่สำเร็จ: '+String(error);
+                select.innerHTML='<option value="">โหลด Revision ไม่สำเร็จ</option>';
+            }
+            return;
+        }
+        if(requestedSite!==siteId)return;
 
         const revisions =
             data.revisions

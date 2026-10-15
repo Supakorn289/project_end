@@ -1323,6 +1323,33 @@ def force_failed_geometry_candidate(
     }
 
 
+
+
+def _stage3f_validate_solver_manifest(site_id, manifest):
+    # No path supplied by clients is trusted. Verify each source-input file is
+    # still byte-identical to the current audited Historical Draft bundle.
+    if manifest.get('source')=='INCOMPLETE_PREPARE_BLOCK_SOLVE':
+        raise RuntimeError('GEOMETRY_PREPARE_INCOMPLETE')
+    if manifest.get('source')!='historical_draft_lab_only':
+        return None
+    if manifest.get('version')!=2 or manifest.get('production_certified') is not False:
+        raise RuntimeError('HISTORICAL_MANIFEST_INVALID')
+    from manager.services.geometry_mark_adapter import historical_draft_solver_inputs
+    import hashlib
+    bundle=historical_draft_solver_inputs(site_id)
+    if bundle['dataset_digest']!=manifest.get('historical_dataset_digest') or bundle['fingerprints']!=manifest.get('historical_fingerprints'):
+        raise RuntimeError('HISTORICAL_DATASET_STALE_REPREPARE')
+    names=('positive_train','negative_train','positive_holdout','negative_holdout')
+    expected_paths=manifest.get('inputs') or {}
+    for key in names:
+        actual=candidate_path(site_id,'geometry_inputs/'+key+'.json')
+        if expected_paths.get(key)!=str(actual) or not actual.is_file() or actual.is_symlink():
+            raise RuntimeError('HISTORICAL_INPUT_PATH_INVALID:'+key)
+        raw=actual.read_bytes()
+        if len(raw)>1_000_000 or json.loads(raw)!=bundle[key]:
+            raise RuntimeError('HISTORICAL_STAGED_INPUT_STALE:'+key)
+    return bundle['dataset_digest']
+
 def run_existing_geometry_solver(
     site_id,
 ):
@@ -1360,6 +1387,13 @@ def run_existing_geometry_solver(
             manifest_path
         )
     )
+
+    try:
+        stage3f_digest=_stage3f_validate_solver_manifest(site_id,manifest)
+    except (RuntimeError,ValueError,KeyError,PermissionError,OSError,TypeError) as exc:
+        return {'ok':False,'error':str(exc).split(':')[0],
+                'runtime_changed':False,'candidate_changed':False}
+
 
 
     intrinsics_file = (
@@ -1910,6 +1944,20 @@ def run_existing_geometry_solver(
         }
 
 
+    if stage3f_digest is not None:
+        try:
+            if _stage3f_validate_solver_manifest(site_id,manifest)!=stage3f_digest:
+                raise RuntimeError('HISTORICAL_CHANGED_DURING_SOLVE')
+        except (RuntimeError,ValueError,KeyError,PermissionError,OSError,TypeError) as exc:
+            return {'ok':False,'error':str(exc).split(':')[0],
+                    'runtime_changed':False,'candidate_changed':False}
+        # Geometry can be a valid LAB candidate and still lack field evidence.
+        # Do not turn historical holdout into Production certification.
+        candidate['historical_source_lab_only']=True
+        candidate['historical_dataset_digest']=stage3f_digest
+        candidate['field_accuracy_proven']=False
+        candidate['valid_for_production']=False
+
     # Copy only into Manager candidate storage.
     # Active runtime is still untouched.
     manager_candidate = (
@@ -1938,6 +1986,9 @@ def run_existing_geometry_solver(
     ][
         "solver_result"
     ] = {
+        "source": "historical_draft_lab_only" if stage3f_digest is not None else "current_wizard",
+        "historical_dataset_digest":stage3f_digest,
+        "requires_field_verification":bool(stage3f_digest),
         "engine":
             "solve_final_mixed_"
             "rotation_AB_v3.py",

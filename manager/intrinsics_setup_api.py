@@ -23,8 +23,9 @@ from manager.services.camera_setup import (
     camera_source_for_site,
 )
 
+from manager.services.wizard_store import CANDIDATE_DIR, safe_site_id
+
 from manager.services.intrinsics_setup import (
-    capture_dir,
     fit_intrinsics_candidate,
     intrinsics_status,
     reset_intrinsics_captures,
@@ -347,11 +348,10 @@ def intrinsics_setup_image(
         }), 400
 
 
+    # STAGE3H1: GET image must not create an empty Candidate directory.
     path = (
-        capture_dir(
-            site_id
-        )
-        / filename
+        CANDIDATE_DIR / safe_site_id(site_id)
+        / "intrinsics_workspace" / "captures" / filename
     )
 
 

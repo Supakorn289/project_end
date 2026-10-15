@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import socket
+import subprocess
+
 
 
 SOCKET_PATH = (
@@ -89,6 +91,30 @@ def _call(
         }
 
 
+def ensure_hardware_site_safe(site_id):
+    """Reject a different site's hardware operation while detection runs.
+
+    Never rely on an HTTP/UI flag or trust a missing/unknown systemd state.
+    If detection is explicitly inactive, commissioning can proceed under its
+    existing authorization and lease checks. This function makes no writes.
+    """
+    from manager.services.site_store import get_active_site
+    active = (get_active_site() or {}).get('site_id')
+    if active and str(site_id) == str(active):
+        return
+    try:
+        process = subprocess.run(
+            ['/usr/bin/systemctl', 'is-active', 'smart-fire-detection.service'],
+            capture_output=True, text=True, timeout=8, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise PermissionError('other_site_hardware_state_unknown_stop') from exc
+    # Only explicit inactive is accepted. active/activating/reloading/failed/
+    # unknown fail closed to avoid taking over a potentially running camera.
+    if process.stdout.strip() != 'inactive':
+        raise PermissionError('other_site_hardware_requires_maintenance_stop')
+
+
 def worker_health():
 
     return _call({
@@ -102,6 +128,8 @@ def capture_preset(
     preset,
     capture_set="main",
 ):
+
+    ensure_hardware_site_safe(site_id)
 
     return _call({
         "action":
@@ -126,6 +154,8 @@ def intrinsics_probe(
     min_sharpness=0.0,
 ):
 
+    ensure_hardware_site_safe(site_id)
+
     return _call({
         "action":
             "intrinsics_probe",
@@ -148,6 +178,8 @@ def intrinsics_capture(
     camera_source,
     min_sharpness=0.0,
 ):
+
+    ensure_hardware_site_safe(site_id)
 
     return _call({
         "action":
