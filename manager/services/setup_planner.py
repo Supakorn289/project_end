@@ -1,7 +1,21 @@
 from __future__ import annotations
 
+import json
+import math
+from pathlib import Path
+
+from manager.config import (
+    CALIBRATION_ROOT,
+    SITE_FILE,
+)
 from manager.services.discovery import (
     get_discovery_snapshot,
+)
+from manager.services.site_registry import (
+    list_registered_sites,
+)
+from manager.services.wizard_store import (
+    load_state,
 )
 
 
@@ -254,6 +268,12 @@ def get_setup_plan(
     )
 
 
+    active_site = (
+        discovery
+        .get("installation", {})
+        .get("active_site")
+    )
+
     distance_loaded = bool(
         calibration[
             "distance"
@@ -269,14 +289,46 @@ def get_setup_plan(
             if distance_loaded
             else "DEFERRED"
         )
+        distance_detail = (
+            "Calibration loaded; "
+            "field accuracy not yet validated."
+            if distance_loaded
+            else
+            "Distance calibration is not loaded."
+        )
 
     else:
 
-        distance_status = (
-            "FIELD_VALIDATION_REQUIRED"
-            if distance_loaded
-            else "REQUIRED"
+        wizard_state = {}
+        if active_site:
+            try:
+                wizard_state = load_state(active_site)
+            except Exception:
+                wizard_state = {}
+
+        verifications = (
+            wizard_state
+            .get("distance", {})
+            .get("verifications", [])
         )
+
+        if distance_loaded and len(verifications) > 0:
+            distance_status = "READY"
+            distance_detail = (
+                f"Calibration verified "
+                f"({len(verifications)} field points)."
+            )
+        elif distance_loaded:
+            distance_status = "FIELD_VALIDATION_REQUIRED"
+            distance_detail = (
+                "Calibration loaded; "
+                "field accuracy not yet validated."
+            )
+        else:
+            distance_status = "REQUIRED"
+            distance_detail = (
+                "Distance calibration is not loaded."
+            )
 
 
     checklist.append(
@@ -284,13 +336,7 @@ def get_setup_plan(
             "distance",
             "Distance calibration",
             distance_status,
-            (
-                "Calibration loaded; "
-                "field accuracy not yet validated."
-                if distance_loaded
-                else
-                "Distance calibration is not loaded."
-            ),
+            distance_detail,
         )
     )
 
@@ -317,21 +363,148 @@ def get_setup_plan(
 
     else:
 
+        north_ready = False
+        north_detail = (
+            "Production verification required."
+        )
+        site_file_candidates = [
+            SITE_FILE,
+        ]
+        if active_site:
+            site_file_candidates.append(
+                CALIBRATION_ROOT
+                / ".manager"
+                / "candidates"
+                / active_site
+                / "site.json"
+            )
+            site_file_candidates.append(
+                CALIBRATION_ROOT
+                / "sites"
+                / active_site
+                / "site.json"
+            )
+
+        for s_file in site_file_candidates:
+            if s_file and s_file.exists():
+                try:
+                    s_data = json.loads(
+                        s_file.read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    offset = s_data.get(
+                        "north_offset_deg"
+                    )
+                    if (
+                        offset is not None
+                        and math.isfinite(float(offset))
+                    ):
+                        north_ready = True
+                        north_detail = (
+                            f"Bearing offset calibrated: "
+                            f"{float(offset):.1f}°"
+                        )
+                        break
+                except Exception:
+                    pass
+
         checklist.append(
             _item(
                 "north",
                 "True North",
-                "REQUIRED",
-                "Production verification required.",
+                (
+                    "READY"
+                    if north_ready
+                    else "REQUIRED"
+                ),
+                north_detail,
             )
         )
+
+        gps_ready = False
+        gps_detail = (
+            "Production verification required."
+        )
+        lat = None
+        lon = None
+
+        if active_site:
+            try:
+                registry = list_registered_sites()
+                site_rec = (
+                    registry
+                    .get("sites", {})
+                    .get(active_site, {})
+                )
+                loc = site_rec.get("location", {})
+                lat = loc.get("latitude")
+                lon = loc.get("longitude")
+            except Exception:
+                pass
+
+        if lat is None or lon is None:
+            loc_candidates = []
+            if active_site:
+                loc_candidates.append(
+                    CALIBRATION_ROOT
+                    / ".manager"
+                    / "candidates"
+                    / active_site
+                    / "location.json"
+                )
+            loc_candidates.append(
+                CALIBRATION_ROOT / "location.json"
+            )
+            for l_file in loc_candidates:
+                if l_file and l_file.exists():
+                    try:
+                        l_data = json.loads(
+                            l_file.read_text(
+                                encoding="utf-8"
+                            )
+                        )
+                        lat = (
+                            l_data.get("camera_lat")
+                            or l_data.get("latitude")
+                        )
+                        lon = (
+                            l_data.get("camera_lon")
+                            or l_data.get("longitude")
+                        )
+                        if lat is not None and lon is not None:
+                            break
+                    except Exception:
+                        pass
+
+        if lat is not None and lon is not None:
+            try:
+                lat_f = float(lat)
+                lon_f = float(lon)
+                if (
+                    math.isfinite(lat_f)
+                    and math.isfinite(lon_f)
+                    and -90.0 <= lat_f <= 90.0
+                    and -180.0 <= lon_f <= 180.0
+                ):
+                    gps_ready = True
+                    gps_detail = (
+                        f"Coordinates: "
+                        f"{lat_f:.5f}, {lon_f:.5f}"
+                    )
+            except (TypeError, ValueError):
+                pass
 
         checklist.append(
             _item(
                 "gps",
                 "GPS",
-                "REQUIRED",
-                "Production verification required.",
+                (
+                    "READY"
+                    if gps_ready
+                    else "REQUIRED"
+                ),
+                gps_detail,
             )
         )
 

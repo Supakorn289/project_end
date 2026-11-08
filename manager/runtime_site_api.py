@@ -283,3 +283,38 @@ def runtime_trash_restore(kind, site_id, archive_id):
                        data.get("confirm_value", ""), data.get("expected_proof", "")))
     except Exception as exc:
         return _error(exc, 409)
+
+
+# Detection service control API
+@runtime_site_bp.get("/api/detection/status")
+def detection_status_endpoint():
+    try:
+        from manager.services.runtime_settings import detection_status
+        return jsonify(detection_status())
+    except Exception as exc:
+        return _error(exc)
+
+
+@runtime_site_bp.post("/api/detection/stop")
+@require_manager_session
+def detection_stop_endpoint():
+    try:
+        from manager.services.runtime_settings import stop_detection
+        res = stop_detection()
+        status_code = 200 if res.get("ok") else 500
+        return jsonify(res), status_code
+    except Exception as exc:
+        return _error(exc)
+
+
+@runtime_site_bp.post("/api/detection/start")
+@require_manager_session
+def detection_start_endpoint():
+    try:
+        from manager.services.runtime_settings import start_detection
+        res = start_detection()
+        status_code = 200 if res.get("ok") else 500
+        return jsonify(res), status_code
+    except Exception as exc:
+        return _error(exc)
+

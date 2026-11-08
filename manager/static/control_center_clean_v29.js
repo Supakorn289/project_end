@@ -4,7 +4,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const enc = encodeURIComponent;
-  const state = {inventory:null, site:'', revision:'', plan:null, csrf:'', busy:false, generation:0, deleteSitePreview:null, deleteRevisionPreview:null, previewRequest:0, trash:[], trashLoading:false};
+  const state = {inventory:null, site:'', revision:'', plan:null, csrf:'', busy:false, generation:0, deleteSitePreview:null, deleteRevisionPreview:null, previewRequest:0, trash:[], trashLoading:false, detectionActive:null};
   const site = () => state.inventory?.sites?.find(s => s.site_id === state.site);
   const rev = () => site()?.revisions?.find(r => r.revision_id === state.revision);
   const active = () => state.inventory?.active_site === state.site;
@@ -175,9 +175,11 @@
     $('sf29-revision-field').hidden = !hasRevision;
     $('sf29-readiness-area').hidden = !hasRevision;
     const main = $('sf29-open-setup');
-    main.textContent = s?.active ? 'แก้ไขพื้นที่และปรับเทียบ' : isFirstSetup(s) ? 'ตั้งค่าพื้นที่นี้' :
-      w.offline_only ? 'ดูชุดแก้ไขกล้องออฟไลน์' : 'สร้างชุดแก้ไขกล้องออฟไลน์';
-    main.disabled = state.busy || !state.csrf || !s || (!s.active && !isFirstSetup(s) && !state.revision);
+    if (main) {
+      main.textContent = s?.active ? 'แก้ไขพื้นที่และปรับเทียบ' : isFirstSetup(s) ? 'ตั้งค่าพื้นที่นี้' :
+        w.offline_only ? 'ดูชุดแก้ไขกล้องออฟไลน์' : 'แก้ไขพื้นที่และปรับเทียบ';
+      main.disabled = Boolean(state.busy || !s);
+    }
     const offline = $('sf29-offline-camera');
     if (offline) {
       offline.hidden = !s || s.active || !w.offline_only;
@@ -200,7 +202,8 @@
     disable('sf29-activate',state.busy || !state.csrf || isCurrent || !ready);
     disable('sf29-delete',state.busy || !state.csrf || !s || s.active || state.deleteSitePreview?.deletable!==true);
     disable('sf29-delete-revision',state.busy || !state.csrf || !hasRev || state.deleteRevisionPreview?.deletable!==true);
-    disable('sf29-open-setup',state.busy || !state.csrf || !s || (!s.active && !isFirstSetup(s) && !state.revision));
+    disable('sf29-open-setup',state.busy || !s);
+    disable('sf29-detection-control',state.busy || !state.csrf);
     disable('sf29-review-save',state.busy || !state.csrf || !s?.working_copy?.offline_only || s.active || !state.offlineReview);
     disable('sf29-review-load',state.busy || !state.csrf || !s?.working_copy?.offline_only || s.active);
     disable('sf29-offline-save',state.busy || !state.csrf || !s || s.active || !s.working_copy?.offline_only);
@@ -218,6 +221,8 @@
       const detection=services.detection || {};
       const manager=services.manager || {};
       const running=detection.active === 'active';
+      state.detectionActive = running;
+      renderDetectionButton(running);
       const automatic=detection.enabled === 'enabled';
       const managing=manager.active === 'active';
       const status=running && automatic && managing
@@ -229,6 +234,55 @@
       target.textContent='ยังตรวจสถานะเริ่มเองไม่ได้ — ดูเมนูระบบ · '+String(e.message || e);
       target.dataset.kind='warn';
     }
+  }
+  function renderDetectionButton(active) {
+    const btn = $('sf29-detection-control');
+    if (!btn) return;
+    if (active === true) {
+      btn.textContent = '⏸ หยุดตรวจจับชั่วคราว';
+      btn.title = 'สถานะ: กำลังตรวจจับ (คลิกเพื่อหยุดชั่วคราวและคืนสิทธิ์กล้อง RTSP/PTZ)';
+      btn.className = 'sf29-btn sf29-warn';
+    } else if (active === false) {
+      btn.textContent = '▶ เริ่มการตรวจจับ';
+      btn.title = 'สถานะ: หยุดทำงาน (คลิกเพื่อเริ่มระบบตรวจจับ)';
+      btn.className = 'sf29-btn sf29-good';
+    } else {
+      btn.textContent = 'ตรวจสถานะตรวจจับ...';
+      btn.className = 'sf29-btn';
+    }
+    btn.disabled = Boolean(state.busy || !state.csrf);
+  }
+  async function updateDetectionStatus() {
+    try {
+      const res = await api('/api/detection/status');
+      const active = Boolean(res?.active);
+      state.detectionActive = active;
+      renderDetectionButton(active);
+    } catch {
+      try {
+        const sys = await api('/api/system');
+        const active = sys?.services?.detection?.active === 'active';
+        state.detectionActive = active;
+        renderDetectionButton(active);
+      } catch {}
+    }
+  }
+  async function toggleDetection() {
+    if (!state.csrf) throw new Error('กรุณาปลดล็อก Manager ก่อนสั่งการ');
+    const currentlyActive = state.detectionActive;
+    if (currentlyActive) {
+      if (!confirm('ยืนยันหยุดการตรวจจับไฟและควันชั่วคราว?\n\nเพื่อคืนสิทธิ์กล้อง RTSP และ PTZ ให้กับงานปรับเทียบ/ตั้งค่า')) return;
+      info('กำลังหยุดการตรวจจับชั่วคราว...', 'info');
+      await api('/api/detection/stop', 'POST');
+      info('หยุดการตรวจจับชั่วคราวแล้ว (คืนสิทธิ์กล้อง RTSP/PTZ เรียบร้อย)', 'success');
+    } else {
+      if (!confirm('ยืนยันเริ่มการตรวจจับไฟและควันทันที?')) return;
+      info('กำลังเริ่มการตรวจจับ...', 'info');
+      await api('/api/detection/start', 'POST');
+      info('เริ่มการตรวจจับเรียบร้อยแล้ว', 'success');
+    }
+    await checkBootReadiness();
+    await updateDetectionStatus();
   }
   async function refresh() {
     const gen=++state.generation;
@@ -244,6 +298,7 @@
     resetDeletePreviews();
     await loadDeletePreviews();
     await checkBootReadiness();
+    await updateDetectionStatus();
     info('โหลดข้อมูลล่าสุดแล้ว ยังไม่ได้เปลี่ยนระบบที่กำลังใช้งาน','success');
   }
   async function loadTrash() {
@@ -415,63 +470,42 @@
     info(result.unchanged ? 'ข้อมูลเหมือนเดิม ไม่มีการเปลี่ยนแปลง' : 'บันทึกค่ากล้องออฟไลน์แล้ว · ต้องตรวจ Camera/PTZ/Intrinsics ใหม่ก่อนใช้งานจริง','success');
   }
   async function openSetup() {
-    const s=state.site;
-    const inventory=await api('/api/runtime-sites');
-    const record=inventory.sites?.find(x=>x.site_id===s);
-    if (!record) throw new Error('Site เปลี่ยนหรือถูกลบ กรุณารีเฟรช');
-    if (inventory.active_site===s) {
-      const r=inventory.active_revision;
-      if (!r) throw new Error('ไม่พบ Active Revision');
-      const w=record.working_copy || {};
-      if (w.exists && w.parent_revision && w.parent_revision!==r) throw new Error('Working Copy ผูก Revision เดิม กรุณาตรวจ Conflict');
-      if (!w.exists) {
-        if (w.candidate_exists) {
-          const detail=await api(`/api/runtime-sites/${enc(s)}/revision/${enc(r)}`);
-          const preview=detail.published_resume || {};
-          if (preview.eligible!==true) throw new Error('Candidate ที่ Publish แล้วต้องตรวจเพิ่มเติม: '+String(preview.reason || 'ไม่เข้าเงื่อนไข Resume'));
-          if (preview.site_id!==s || preview.active_revision!==r || preview.published_revision!==w.published_revision)
-            throw new Error('Revision Lineage เปลี่ยน กรุณารีเฟรช');
-          if (!confirm(`Resume Candidate ที่ Publish เป็น Draft ใหม่?\n\nActive: ${r}\nPublished: ${preview.published_revision}\nไฟล์ ${preview.candidate_file_count} รายการจะคงเดิมทุก byte รวม Settings\n\nRuntime ปัจจุบันจะไม่เปลี่ยน`)) return;
-          if (prompt(`พิมพ์ Site ID/Active Revision เพื่อยืนยัน:\n${s}/${r}`)!==`${s}/${r}`) return;
-          await api(`/api/runtime-sites/${enc(s)}/revision/${enc(r)}/working-copy`,'POST',{
-            resume_published:true,confirm_site_id:s,confirm_revision_id:r,
-            confirm_published_revision_id:preview.published_revision,
-            expected_fingerprint:preview.expected_fingerprint
-          });
-          location.assign(`/setup-wizard?mode=existing&site=${enc(s)}`);
-          return;
-        }
-        if (!confirm(`สร้าง Working Copy จาก Revision ปัจจุบันเพื่อปรับเทียบ?\n${s}/${r}\n\nRuntime จริงจะยังไม่เปลี่ยน`)) return;
-        await api(`/api/runtime-sites/${enc(s)}/revision/${enc(r)}/working-copy`,'POST',{overwrite:false});
+    const s = state.site || $('sf29-site')?.value || state.inventory?.active_site;
+    if (!s) throw new Error('กรุณาเลือกพื้นที่ติดตั้งก่อน');
+
+    // Check if detection is currently active
+    let isRunning = state.detectionActive;
+    if (isRunning === null || isRunning === undefined) {
+      try {
+        const res = await api('/api/detection/status');
+        isRunning = Boolean(res?.active);
+      } catch {
+        try {
+          const sys = await api('/api/system');
+          isRunning = sys?.services?.detection?.active === 'active';
+        } catch {}
       }
-    } else if (!isFirstSetup(record)) {
-      if (record.working_copy?.offline_only) {
-        await loadOfflineCamera();
-        $('sf29-offline-camera').scrollIntoView({block:'nearest',behavior:'smooth'});
-        return;
-      }
-      const selected=state.revision;
-      const revItem=record.revisions?.find(v=>v.revision_id===selected);
-      if (!revItem || revItem.source_exists!==true) throw new Error('ไม่พบ Revision ต้นทางที่ตรวจสอบได้');
-      if (record.working_copy?.candidate_exists || record.working_copy?.state)
-        throw new Error('พื้นที่นี้มี Candidate/ชุดแก้ไขเดิมอยู่ ระบบไม่เขียนทับ ให้ตรวจสอบก่อน');
-      if (!record.updated_at) throw new Error('กรุณาโหลดทะเบียนพื้นที่ใหม่');
-      if (!confirm(`สร้างชุดแก้ไขการเชื่อมต่อกล้องแบบออฟไลน์?\n\nพื้นที่: ${s}\nต้นทาง: ${selected}\n\nไม่จับภาพ ไม่ทดสอบกล้อง ไม่เปลี่ยน Runtime และไม่ทับ Candidate เดิม`)) return;
-      const currentInv=await api('/api/runtime-sites');
-      const latest=currentInv.sites?.find(v=>v.site_id===s);
-      if (currentInv.active_site===s || !latest || latest.updated_at!==record.updated_at ||
-          !latest.revisions?.some(v=>v.revision_id===selected) || latest.working_copy?.candidate_exists || latest.working_copy?.state)
-        throw new Error('ข้อมูลพื้นที่เปลี่ยน กรุณารีเฟรชก่อนสร้างชุดแก้ไข');
-      const result=await api(`/api/runtime-sites/${enc(s)}/revision/${enc(selected)}/working-copy`,'POST',{
-        offline_only:true,overwrite:false,expected_updated_at:record.updated_at
-      });
-      if(result.ok!==true || result.offline_only!==true || result.runtime_changed!==false)
-        throw new Error('Backend ไม่ยืนยันชุดแก้ไขออฟไลน์');
-      await refresh();
-      await loadOfflineCamera();
-      info('สร้างชุดแก้ไขออฟไลน์สำเร็จ · ยังไม่เปิดใช้งานกับ Detection','success');
-      return;
     }
+
+    if (isRunning) {
+      const shouldPause = confirm(
+        `ระบบตรวจจับกำลังทำงานอยู่ (Active)\n\n` +
+        `ต้องการหยุดการตรวจจับชั่วคราว (Pause Detection) ก่อนเปิด Wizard หรือไม่?\n\n` +
+        `[ ตกลง / OK ] = หยุดตรวจจับชั่วคราวเพื่อคืนสิทธิ์กล้อง RTSP/PTZ แล้วเปิด Wizard\n` +
+        `[ ยกเลิก / Cancel ] = เปิด Wizard ทันทีโดยไม่หยุดการตรวจจับ`
+      );
+
+      if (shouldPause) {
+        try {
+          info('กำลังหยุดการตรวจจับชั่วคราวเพื่อคืนสิทธิ์กล้อง...', 'info');
+          await api('/api/detection/stop', 'POST');
+          info('หยุดการตรวจจับชั่วคราวแล้ว กำลังเปิด Setup Wizard...', 'success');
+        } catch (e) {
+          info('ไม่สามารถหยุดการตรวจจับได้อัตโนมัติ: ' + e.message + ' กำลังเปิด Wizard...', 'warn');
+        }
+      }
+    }
+
     location.assign(`/setup-wizard?mode=existing&site=${enc(s)}`);
   }
   async function renameSite() {
@@ -581,6 +615,7 @@
           <p id="sf29-selected-id" class="sf29-id">—</p><div class="sf29-tags"><span id="sf29-mode">—</span><span id="sf29-draft">—</span></div>
           <p class="sf29-guidance" id="sf29-tip">—</p><div id="sf29-warnings" class="sf29-warnings" hidden></div></div>
         <div class="sf29-actions"><button type="button" class="sf29-btn sf29-primary" id="sf29-open-setup" disabled>เปิด Setup Wizard</button>
+          <button type="button" class="sf29-btn" id="sf29-detection-control" disabled>ตรวจสถานะตรวจจับ...</button>
           <button type="button" class="sf29-btn" id="sf29-rename" disabled>เปลี่ยนชื่อที่แสดง</button>
           <button type="button" class="sf29-btn sf29-danger" id="sf29-delete" disabled>ลบพื้นที่นี้</button></div>
         <section class="sf29-offline" id="sf29-offline-camera" hidden>
@@ -772,6 +807,7 @@
     $('sf29-check').addEventListener('click',()=>perform(check));
     $('sf29-activate').addEventListener('click',()=>perform(activate));
     $('sf29-open-setup').addEventListener('click',()=>perform(openSetup));
+    $('sf29-detection-control').addEventListener('click',()=>perform(toggleDetection));
     $('sf29-offline-save').addEventListener('click',()=>perform(saveOfflineCamera));
     $('sf29-offline-reload').addEventListener('click',()=>perform(loadOfflineCamera));
     $('sf29-review-load').addEventListener('click',()=>perform(loadOfflineReview));

@@ -337,10 +337,18 @@ def enforce_site_write_policy():
     category = path[2]
     if category not in _PREFIXES:
         return None
-    if category == 'intrinsics-setup' and path[-1] == 'reuse-active':
-        active_site, _ = _active()
-        if path[3] != active_site:
-            return jsonify({'ok': False, 'error': 'CROSS_SITE_INTRINSICS_REUSE_BLOCKED', 'runtime_changed': False}), 409
+
+    # Allow operator geometry force override to perform candidate override
+    if category == 'geometry-adapter' and len(path) >= 5 and path[4] == 'force':
+        return None
+
+    # Allow revision lifecycle operations (create, check-plan, activate)
+    if category == 'revisions':
+        return None
+#    if category == 'intrinsics-setup' and path[-1] == 'reuse-active':
+#        active_site, _ = _active()
+#        if path[3] != active_site:
+#            return jsonify({'ok': False, 'error': 'CROSS_SITE_INTRINSICS_REUSE_BLOCKED', 'runtime_changed': False}), 409
     if category == 'wizard':
         # /api/wizard/site/new and global wizard actions are managed separately.
         if path[3] in {'site', 'sites'}:

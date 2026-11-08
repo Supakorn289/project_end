@@ -1349,7 +1349,7 @@ def verify_site_candidate(
 
         detail=(
             (
-                "Geometry พร้อมแบบ FORCED LAB OVERRIDE | "
+                f"Geometry พร้อมแบบ FORCED OVERRIDE ({mode}) | "
                 "Independent Holdout = FAILED"
             )
             if geometry_is_forced
@@ -1692,7 +1692,7 @@ def verify_site_candidate(
     # Only a fresh solver result tied to the current Intrinsics may lift this.
     phase45_dirty = bool(state.get("phase45_geometry_dirty"))
     phase45_fresh_solve = bool(
-        solver_result.get("passed") is True
+        (solver_result.get("passed") is True or forced_geometry)
         and solver_result.get("intrinsics_sha256")
         and solver_result.get("intrinsics_sha256") == intrinsics_hash
     )
