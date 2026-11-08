@@ -954,8 +954,8 @@ def failed_geometry_force_status(
                 available
                 and
                 mode
-                ==
-                "LAB"
+                in
+                ("LAB", "PRODUCTION")
             ),
 
         "stale":
@@ -986,8 +986,8 @@ def failed_geometry_force_status(
                         available
                         and
                         mode
-                        !=
-                        "LAB"
+                        not in
+                        ("LAB", "PRODUCTION")
                     )
                     else
                     (
@@ -1124,6 +1124,8 @@ def force_failed_geometry_candidate(
     )
 
 
+    mode = str(status.get("mode") or "LAB").upper()
+
     forced[
         "operator_override"
     ] = {
@@ -1134,7 +1136,7 @@ def force_failed_geometry_candidate(
             True,
 
         "scope":
-            "LAB",
+            mode,
 
         "forced_at_utc":
             forced_at,

@@ -3863,7 +3863,7 @@ async function refreshGeometryForceStatus(){
                     ""
                 )
                 +
-                "\nLAB เท่านั้น · Runtime ยังไม่ถูกเปลี่ยน";
+                (data.mode === "PRODUCTION" ? "\nโหมด PRODUCTION · Runtime ยังไม่ถูกเปลี่ยน" : "\nLAB เท่านั้น · Runtime ยังไม่ถูกเปลี่ยน");
 
 
             return data;

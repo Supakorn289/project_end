@@ -54,6 +54,8 @@ body {font-size:14px;line-height:1.55;}
 .sf29-btn {min-height:41px;padding:9px 15px;color:#eaf2ff;border:1px solid #455a72;border-radius:9px;background:#223146;font-weight:600;}
 .sf29-btn:hover:not(:disabled) {filter:brightness(1.14);}
 .sf29-primary {background:#225bae;border-color:#3079e1;color:#fff;}
+.sf29-good {background:#1c3b28;border-color:#2b7044;color:#a4f4c2;}
+.sf29-warn {background:#3c2a16;border-color:#8c5b20;color:#fed08b;}
 .sf29-danger {background:transparent;border-color:#6e3a43;color:#faafb1;}
 .sf29-textbtn {border:0;background:transparent;color:#96c6ff;padding:8px;}
 .sf29-textbtn:hover {text-decoration:underline;}
